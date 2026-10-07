@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parse } from "dotenv";
 import { randomUUID } from "node:crypto";
-import { chromium } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 import { seedWater } from "../src/water-domain.ts";
 const url = process.argv[2] || "http://127.0.0.1:5173/#/water";
 const backend =
@@ -114,8 +114,7 @@ try {
   await reader.getByRole("button", { name: "公开保存反馈" }).click();
   await reader.getByRole("dialog").waitFor({ state: "hidden" });
   await reader.getByLabel("只看用户反馈有货").check();
-  await reader.locator(".water-offer").nth(1).waitFor({ state: "hidden" });
-  assert.equal(await reader.locator(".water-offer").count(), 1);
+  await expect(reader.locator(".water-offer")).toHaveCount(1);
   const qa = await call();
   assert.equal(
     qa.offers.find((o) => o.storeName.includes("K11")).feedback.available,
