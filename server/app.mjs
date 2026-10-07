@@ -6,11 +6,8 @@ import waterWorker from "../worker/index.mjs";
 import { getWaterDB } from "./water-db.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const groups = [
-  ["snack", "赵一鸣零食|零食很忙|零食有鸣|零食折扣"],
-  ["discount", "好特卖|嗨特购|奥特乐|折扣超市"],
-  ["daily", "名创优品|三福|十元店|平价百货"],
-  ["market", "菜市场|农贸市场|生鲜折扣"],
-  ["meal", "沙县小吃|兰州拉面|社区食堂|蜜雪冰城"],
+  ["discount", "赵一鸣零食|零食很忙|零食有鸣|好特卖|嗨特购|奥特乐"],
+  ["mixue", "蜜雪冰城"],
 ];
 const str = (value) => (typeof value === "string" ? value : "");
 export function createApp({ env = process.env, upstream = fetch } = {}) {
@@ -26,7 +23,7 @@ export function createApp({ env = process.env, upstream = fetch } = {}) {
   app.use(["/api", "/_AMapService"], (req, res, next) => {
     if (
       env.QA_TOKEN &&
-      req.originalUrl.startsWith("/api/water") &&
+      /^\/api\/(water|community|analytics)/.test(req.originalUrl) &&
       req.get("X-QA-Token") === env.QA_TOKEN
     ) {
       next();
@@ -46,42 +43,45 @@ export function createApp({ env = process.env, upstream = fetch } = {}) {
     next();
   });
   const waterGuard = randomUUID();
-  app.use("/api/water", async (req, res) => {
-    try {
-      const chunks = [];
-      let bytes = 0;
-      for await (const chunk of req) {
-        bytes += chunk.length;
-        if (bytes > 8192) {
-          res.status(413).json({ error: "内容过长。" });
-          return;
+  app.use(
+    ["/api/water", "/api/community", "/api/analytics"],
+    async (req, res) => {
+      try {
+        const chunks = [];
+        let bytes = 0;
+        for await (const chunk of req) {
+          bytes += chunk.length;
+          if (bytes > 8192) {
+            res.status(413).json({ error: "内容过长。" });
+            return;
+          }
+          chunks.push(chunk);
         }
-        chunks.push(chunk);
+        const body = Buffer.concat(chunks).toString("utf8");
+        const headers = new Headers();
+        for (const [key, value] of Object.entries(req.headers))
+          if (typeof value === "string") headers.set(key, value);
+        headers.set("cf-connecting-ip", req.ip || "local");
+        const request = new Request("http://127.0.0.1" + req.originalUrl, {
+          method: req.method,
+          headers,
+          ...(!["GET", "HEAD"].includes(req.method) && body ? { body } : {}),
+        });
+        const response = await waterWorker.fetch(request, {
+          ...env,
+          DB: getWaterDB(),
+          QA_TOKEN: env.QA_TOKEN || waterGuard,
+          STORAGE_KIND: "SQLite",
+        });
+        response.headers.forEach((v, k) => res.set(k, v));
+        res
+          .status(response.status)
+          .send(Buffer.from(await response.arrayBuffer()));
+      } catch {
+        res.status(503).json({ error: "水价服务暂时不可用。" });
       }
-      const body = Buffer.concat(chunks).toString("utf8");
-      const headers = new Headers();
-      for (const [key, value] of Object.entries(req.headers))
-        if (typeof value === "string") headers.set(key, value);
-      headers.set("cf-connecting-ip", req.ip || "local");
-      const request = new Request("http://127.0.0.1" + req.originalUrl, {
-        method: req.method,
-        headers,
-        ...(!["GET", "HEAD"].includes(req.method) && body ? { body } : {}),
-      });
-      const response = await waterWorker.fetch(request, {
-        ...env,
-        DB: getWaterDB(),
-        QA_TOKEN: env.QA_TOKEN || waterGuard,
-        STORAGE_KIND: "SQLite",
-      });
-      response.headers.forEach((v, k) => res.set(k, v));
-      res
-        .status(response.status)
-        .send(Buffer.from(await response.arrayBuffer()));
-    } catch {
-      res.status(503).json({ error: "水价服务暂时不可用。" });
-    }
-  });
+    },
+  );
   const get = async (endpoint, params) => {
     const url = new URL(`https://restapi.amap.com${endpoint}`);
     for (const [key, value] of Object.entries(params))
@@ -232,7 +232,7 @@ export function createApp({ env = process.env, upstream = fetch } = {}) {
       return res.status(503).json({ error: "高德 JS 安全密钥未配置。" });
     const pathname = req.path;
     if (
-      !/^\/v[345]\/(place\/(around|text|detail)|geocode\/(geo|regeo)|assistant\/inputtips|config\/district|map\/styles)\/?$/.test(
+      !/^\/v[345]\/(place\/(around|text|detail)|geocode\/(geo|regeo)|assistant\/inputtips|config\/district|map\/styles|log\/init)\/?$/.test(
         pathname,
       )
     )

@@ -4,3 +4,7 @@ CREATE INDEX IF NOT EXISTS revisions_offer ON revisions(scope,offer_id,seq);
 CREATE TABLE IF NOT EXISTS feedback (id TEXT PRIMARY KEY, scope TEXT NOT NULL, offer_id TEXT NOT NULL, type TEXT NOT NULL, note TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS feedback_offer ON feedback(scope,offer_id,created_at);
 CREATE TABLE IF NOT EXISTS rate_limits (ip_hash TEXT NOT NULL, bucket INTEGER NOT NULL, count INTEGER NOT NULL, PRIMARY KEY(ip_hash,bucket));
+CREATE TABLE IF NOT EXISTS comments (scope TEXT NOT NULL, id TEXT NOT NULL, store_id TEXT NOT NULL, parent_id TEXT, root_id TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(scope,id));
+CREATE INDEX IF NOT EXISTS comments_store ON comments(scope,store_id,created_at);
+CREATE TABLE IF NOT EXISTS analytics_events (scope TEXT NOT NULL, id TEXT NOT NULL, session_id TEXT NOT NULL, page TEXT NOT NULL, name TEXT NOT NULL, properties TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(scope,id));
+CREATE INDEX IF NOT EXISTS analytics_time ON analytics_events(scope,created_at);

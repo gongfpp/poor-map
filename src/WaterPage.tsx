@@ -1,3 +1,4 @@
+import { track } from "./telemetry";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -77,7 +78,10 @@ async function api(path = "", init?: RequestInit) {
     signal: init?.signal || AbortSignal.timeout(15000),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "共享水价服务暂时不可用。");
+  if (!response.ok) {
+    track("api_error", { statusCode: response.status });
+    throw new Error(data.error || "共享水价服务暂时不可用。");
+  }
   return data;
 }
 export default function WaterPage() {
@@ -256,11 +260,14 @@ export default function WaterPage() {
     setDraftCenter(null);
   }
   async function locate() {
+    track("location_request");
     chosen.current = true;
     setLocating(true);
     try {
       pickCenter(await currentLocation(true), "当前位置 · 已获得设备定位");
+      track("location_success");
     } catch (e) {
+      track("location_failure");
       setPosition(`${(e as Error).message} · 保留当前中心`);
       setNotice("定位失败，可先看宁波已有线索，或允许浏览器的位置权限后重试。");
     } finally {
@@ -268,6 +275,7 @@ export default function WaterPage() {
     }
   }
   function edit(offer?: WaterOffer | WaterInput) {
+    track("water_submit", { action: "open" });
     setEditing(offer || null);
     setModal("edit");
   }
@@ -300,6 +308,13 @@ export default function WaterPage() {
     }
   }
   const update = (patch: Partial<WaterFilters>) => {
+    track("water_filter", {
+      field: Object.keys(patch)[0],
+      radius: patch.radius,
+      sort: patch.sort,
+      spec: patch.pack,
+      includeInactive: patch.includeInactive,
+    });
     setFilters((f) => ({ ...f, ...patch }));
     setSelected(null);
   };
@@ -443,7 +458,10 @@ export default function WaterPage() {
             <button
               title="刷新共享水价"
               aria-label="刷新共享水价"
-              onClick={() => setRefresh((r) => r + 1)}
+              onClick={() => {
+                track("water_refresh");
+                setRefresh((r) => r + 1);
+              }}
             >
               <RefreshCw size={15} />
             </button>
@@ -452,7 +470,14 @@ export default function WaterPage() {
             <div className="water-error" role="alert">
               {loadError}{" "}
               {offers.length > 0 ? "当前显示上次读取的线索，暂不能提交。" : ""}
-              <button onClick={() => setRefresh((r) => r + 1)}>重试</button>
+              <button
+                onClick={() => {
+                  track("water_refresh");
+                  setRefresh((r) => r + 1);
+                }}
+              >
+                重试
+              </button>
             </div>
           )}
           <div className="water-content">
@@ -583,6 +608,7 @@ export default function WaterPage() {
                         onClick={() => {
                           setFeedbackOffer(o);
                           setModal("feedback");
+                          track("water_feedback", { action: "open" });
                         }}
                         disabled={!ready}
                       >
@@ -595,6 +621,7 @@ export default function WaterPage() {
                         onClick={() => {
                           setFeedbackOffer(o);
                           setModal("history");
+                          track("water_history");
                         }}
                       >
                         <History size={14} />
@@ -739,6 +766,7 @@ export default function WaterPage() {
                   onClick={() => {
                     setFeedbackOffer(selectedOffer);
                     setModal("feedback");
+                    track("water_feedback", { action: "open" });
                   }}
                 >
                   <MessageSquare size={13} />
@@ -785,6 +813,7 @@ export default function WaterPage() {
             initial={editing}
             config={config}
             onSave={async (input) => {
+              track("water_submit", { action: "submit" });
               const existing = editing && "id" in editing ? editing : null;
               await api(existing ? `/${existing.id}` : "", {
                 method: existing ? "PUT" : "POST",
@@ -796,6 +825,7 @@ export default function WaterPage() {
               });
               setModal(null);
               setRefresh((r) => r + 1);
+              track("water_save", { status: "success" });
               setNotice(
                 "已保存到共享线索库，其他浏览器可以看到。内容仍是用户提供、未核验的线索。",
               );
@@ -810,6 +840,7 @@ export default function WaterPage() {
         >
           <Feedback
             onSave={async (type, note) => {
+              track("water_feedback", { action: "submit", status: type });
               await api(`/${feedbackOffer.id}/feedback`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },

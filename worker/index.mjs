@@ -1,3 +1,4 @@
+import { communityRoute } from "./community.mjs";
 import { seedWater, validateWater } from "../src/water-domain.ts";
 const origins = new Set([
   "https://gongfpp.github.io",
@@ -110,6 +111,14 @@ export async function route(req, env) {
           : "")
       : "public";
   if (req.method === "OPTIONS") return new Response(null, { status: 204 });
+  if (
+    path.startsWith("/api/community/") ||
+    path.startsWith("/api/analytics/")
+  ) {
+    if (req.method === "POST" && !isQA && !origins.has(origin))
+      return output({ error: "请从穷鬼地图页面提交。" }, 403);
+    return communityRoute(req, env, scope, { isQA, rate, body, output });
+  }
   if (path === "/api/water/config" && req.method === "GET")
     return output({
       jsKey: env.AMAP_JS_KEY || "",
@@ -139,7 +148,7 @@ export async function route(req, env) {
       return output({ error: "地图请求较频繁，请稍后重试。" }, 429);
     const upstreamPath = path.replace("/_AMapService", "");
     if (
-      !/^\/v[345]\/(place\/(around|text|detail)|geocode\/(geo|regeo)|assistant\/inputtips|config\/district|map\/styles)\/?$/.test(
+      !/^\/v[345]\/(place\/(around|text|detail)|geocode\/(geo|regeo)|assistant\/inputtips|config\/district|map\/styles|log\/init)\/?$/.test(
         upstreamPath,
       )
     )
@@ -432,7 +441,7 @@ export default {
     headers.set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
     headers.set(
       "Access-Control-Allow-Headers",
-      "Content-Type,X-QA-Token,X-QA-Scope",
+      "Content-Type,Authorization,X-QA-Token,X-QA-Scope",
     );
     return new Response(response.body, { status: response.status, headers });
   },

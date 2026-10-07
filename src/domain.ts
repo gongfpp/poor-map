@@ -1,4 +1,5 @@
-export type Category = "snack" | "discount" | "daily" | "market" | "meal";
+export type Category =
+  "snack" | "discount" | "daily" | "market" | "meal" | "mixue";
 export type DealKind = "free" | "checkin" | "discount";
 export type Store = {
   id: string;
@@ -80,6 +81,23 @@ export const categories: {
     keywords: "沙县小吃|兰州拉面|社区食堂|蜜雪冰城",
   },
 ];
+export const activeCategories = [
+  {
+    id: "discount" as Category,
+    label: "硬折扣店",
+    short: "折扣",
+    color: "#8a68d8",
+    keywords: "赵一鸣零食|零食很忙|零食有鸣|好特卖|嗨特购|奥特乐",
+  },
+  {
+    id: "mixue" as Category,
+    label: "蜜雪冰城",
+    short: "蜜雪",
+    color: "#e47b86",
+    keywords: "蜜雪冰城",
+  },
+];
+categories.push(activeCategories[1]);
 export const cities = [
   { name: "宁波", center: [121.55027, 29.87386] as [number, number] },
   { name: "杭州", center: [120.15507, 30.27408] as [number, number] },

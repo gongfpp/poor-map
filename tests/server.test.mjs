@@ -80,7 +80,7 @@ test("POIs are deduplicated and cached without invented prices", async () => {
       assert.equal(data.stores[0].source, "amap");
       assert.equal(data.stores[0].price, undefined);
       await fetch(`${base}/api/nearby?center=121.55,29.87`);
-      assert.equal(calls, 5);
+      assert.equal(calls, 2);
     },
   );
 });
@@ -119,8 +119,8 @@ test("partial failure and truncated result sets are surfaced", async () =>
       const data = await r.json();
       assert.equal(r.status, 200);
       assert.equal(data.partial, true);
-      assert.equal(data.stores.length, 4);
-      assert.equal(data.warnings.length, 5);
+      assert.equal(data.stores.length, 1);
+      assert.equal(data.warnings.length, 2);
     },
   ));
 test("SDK proxy is allowlisted and injects server credentials only upstream", async () =>

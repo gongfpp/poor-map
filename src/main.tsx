@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import WaterPage from "./WaterPage";
 import "./style.css";
+import { installTelemetry } from "./telemetry";
+installTelemetry();
 function Router() {
   const [route, setRoute] = useState(location.hash);
   useEffect(() => {

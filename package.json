@@ -13,7 +13,9 @@
     "deploy:api": "wrangler deploy",
     "start": "node server/index.mjs",
     "test": "node --import tsx --test tests/*.test.*",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "analytics:report": "node scripts/analytics-report.mjs",
+    "verify:community": "node scripts/verify-community.mjs"
   },
   "dependencies": {
     "dotenv": "^18.0.6",

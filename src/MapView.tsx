@@ -1,6 +1,7 @@
+import { track } from "./telemetry";
 import { useEffect, useRef, useState } from "react";
 import { LocateFixed, Minus, Plus, RotateCcw } from "lucide-react";
-import { categories, type Store } from "./domain";
+import { categories, activeCategories, type Store } from "./domain";
 declare global {
   interface Window {
     AMap: any;
@@ -114,12 +115,16 @@ export default function MapView({
           clearTimeout(readyTimer);
           if (!cancelled) {
             setReady(true);
+            track("map_ready");
             setMapState("");
           }
         });
       })
       .catch((e) => {
-        if (!cancelled) setMapState(e.message);
+        if (!cancelled) {
+          setMapState(e.message);
+          track("map_error");
+        }
       });
     return () => {
       cancelled = true;
@@ -172,6 +177,7 @@ export default function MapView({
     };
   }, [stores, selected, ready, eventIds, waterMode, markerLabels]);
   function changeZoom(delta: number) {
+    track("map_zoom", { action: delta > 0 ? "zoom_in" : "zoom_out" });
     if (map.current) map.current.setZoom(map.current.getZoom() + delta);
     else setZoom((z) => Math.min(1.8, Math.max(0.65, z + delta * 0.2)));
   }
@@ -392,7 +398,14 @@ export default function MapView({
       {!demo && mapState && (
         <div className="map-error">
           {mapState}
-          <button onClick={() => setRetry((v) => v + 1)}>重新加载</button>
+          <button
+            onClick={() => {
+              track("map_retry");
+              setRetry((v) => v + 1);
+            }}
+          >
+            重新加载
+          </button>
         </div>
       )}
       <div className="map-controls">
@@ -400,6 +413,7 @@ export default function MapView({
           title="回到搜索中心"
           aria-label="回到搜索中心"
           onClick={() => {
+            track("map_reset");
             map.current?.setCenter(center);
             setZoom(1);
           }}
@@ -439,18 +453,12 @@ export default function MapView({
             </span>
           </>
         ) : (
-          categories.map((c) => (
+          activeCategories.map((c) => (
             <span key={c.id}>
               <i style={{ background: c.color }} />
               {c.short}
             </span>
           ))
-        )}
-        {!waterMode && (
-          <span>
-            <i style={{ background: "#5d35c9" }} />
-            免费线索
-          </span>
         )}
       </div>
     </div>

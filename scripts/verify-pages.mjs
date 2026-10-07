@@ -46,24 +46,20 @@ try {
     });
     await page.goto(url);
     await page.locator(".store-card").first().waitFor();
-    assert.equal(await page.locator(".store-card").count(), 12);
+    assert.equal(await page.locator(".store-card").count(), 6);
     await page.getByRole("button", { name: "硬折扣店", exact: true }).click();
-    assert.equal(await page.locator(".store-card").count(), 3);
-    await page.getByRole("button", { name: "全部发现", exact: true }).click();
+    assert.equal(await page.locator(".store-card").count(), 5);
+    await page.getByRole("button", { name: "全部", exact: true }).click();
     await page
       .getByRole("button", { name: "收藏 赵一鸣零食 · 街角店", exact: true })
       .click();
     await page.reload();
     await page.getByRole("button", { name: /我的收藏/ }).click();
     assert.equal(await page.locator(".store-card").count(), 1);
-    await page.getByRole("button", { name: /优惠活动/ }).click();
-    await page.getByLabel("免额外消费").check();
-    await page.getByLabel("无需抽签").check();
-    await page.getByLabel("价格上限").selectOption("0");
+    await page.getByRole("button", { name: "附近门店", exact: true }).click();
+    await page.getByRole("button", { name: "蜜雪冰城", exact: true }).click();
     assert.equal(await page.locator(".store-card").count(), 1);
-    assert.ok(
-      (await page.locator(".store-title").innerText()).includes("蜜雪冰城"),
-    );
+    assert.equal(await page.getByLabel("价格上限").count(), 0);
     if (name === "mobile")
       await page.getByRole("button", { name: /看地图/ }).click();
     await page
@@ -71,7 +67,7 @@ try {
       .click();
     assert.ok(
       (await page.getByRole("dialog").innerText()).includes(
-        "GitHub Pages · 公开演示版",
+        "首页门店仍为演示数据",
       ),
     );
     assert.ok(
@@ -92,7 +88,13 @@ try {
       path: `/tmp/poor-map-pages-${name}.png`,
       fullPage: true,
     });
-    assert.deepEqual(apiRequests, []);
+    assert.ok(
+      apiRequests.every(
+        (u) =>
+          u.startsWith("https://poor-map-api.gong7968.workers.dev/") &&
+          /\/api\/(analytics|community)\//.test(u),
+      ),
+    );
     assert.deepEqual(errors, []);
     assert.deepEqual(badResponses, []);
     results.push({
