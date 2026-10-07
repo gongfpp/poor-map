@@ -126,6 +126,10 @@ export default function App() {
   );
   const current = stores.find((s) => s.id === selected);
   useEffect(() => {
+    if (modal === "report" && !sharingStore && stores.length)
+      setSharingStore(selected || visible[0]?.id || stores[0].id);
+  }, [modal, sharingStore, stores, selected, visible]);
+  useEffect(() => {
     if (demo) return;
     const c = new AbortController();
     setLoading(true);
@@ -306,6 +310,7 @@ export default function App() {
           <button
             className="contribute"
             aria-label="分享省钱线索"
+            disabled={loading || !stores.length}
             onClick={share}
           >
             <Plus size={17} />
@@ -325,7 +330,7 @@ export default function App() {
             <label className="search-box">
               <Search size={18} />
               <input
-                aria-label="搜索门店或优惠"
+                aria-label="搜索门店"
                 placeholder="搜门店或品牌"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}

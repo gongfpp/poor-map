@@ -96,7 +96,7 @@ export default function TiandituMapView({
       failed = false,
       reported = false;
     const timer = setTimeout(() => {
-      setState("天地图加载超时，请检查网络、Key权限或配额后重试。");
+      setState("地图加载超时，请检查网络后重试。");
       track("map_error");
     }, 20000);
     layers.forEach((layer, i) => {
@@ -107,7 +107,7 @@ export default function TiandituMapView({
         failed = true;
         setReady(false);
         callbacks.current.onReadyChange?.(false);
-        setState("天地图瓦片加载失败，请检查网络、Key权限或配额后重试。");
+        setState("天地图暂时无法加载，请稍后重试。");
         if (!reported) {
           track("map_error");
           reported = true;

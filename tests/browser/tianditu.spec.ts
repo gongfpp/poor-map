@@ -91,7 +91,7 @@ test("failed basemap cannot be advertised ready or accept a guessed store locati
     r.fulfill({ json: { accepted: 1 } }),
   );
   await page.goto("/");
-  await expect(page.locator(".map-error")).toContainText("瓦片加载失败");
+  await expect(page.locator(".map-error")).toContainText("暂时无法加载");
   await expect(page.getByRole("button", { name: "标记门店" })).toBeDisabled();
   await page.route("https://t*.tianditu.gov.cn/**", (r) =>
     r.fulfill({ contentType: "image/png", body: png }),

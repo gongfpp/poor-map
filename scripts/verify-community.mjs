@@ -72,7 +72,7 @@ try {
   });
   await a.keyboard.press("Escape");
   await a.getByRole("button", { name: "硬折扣店", exact: true }).click();
-  await a.getByLabel("搜索门店或优惠").fill("此搜索不应被采集");
+  await a.getByLabel("搜索门店").fill("此搜索不应被采集");
   await expect
     .poll(
       async () =>

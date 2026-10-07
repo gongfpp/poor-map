@@ -77,9 +77,9 @@ test("shared stores default to all, only two categories and no product price con
   await expect(page.locator(".results")).not.toContainText("¥");
   await page.getByRole("button", { name: "硬折扣店", exact: true }).click();
   await expect(page.locator(".store-card")).toHaveCount(2);
-  await page.getByLabel("搜索门店或优惠").fill("好特卖");
+  await page.getByLabel("搜索门店").fill("好特卖");
   await expect(page.locator(".store-card")).toHaveCount(1);
-  await page.getByLabel("搜索门店或优惠").fill("");
+  await page.getByLabel("搜索门店").fill("");
   await page.getByRole("button", { name: "蜜雪冰城", exact: true }).click();
   await expect(page.locator(".store-card")).toHaveCount(1);
 });
@@ -143,7 +143,7 @@ test("analytics excludes search words and stops after opt out", async ({
     packets.push(r.request().postDataJSON());
     return r.fulfill({ json: { accepted: 1 } });
   });
-  await page.getByLabel("搜索门店或优惠").fill("秘密搜索");
+  await page.getByLabel("搜索门店").fill("秘密搜索");
   await page.getByRole("button", { name: "硬折扣店", exact: true }).click();
   await expect
     .poll(() => packets.length, { timeout: 10000 })
@@ -155,4 +155,23 @@ test("analytics excludes search words and stops after opt out", async ({
   await page.reload();
   await page.waitForTimeout(5500);
   expect(packets).toEqual([]);
+});
+
+test("sharing waits for asynchronous store data and opens a usable one-sentence form", async ({
+  page,
+}) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  await page.route("**/api/community/stores", async (r) => {
+    await gate;
+    await r.fulfill({ json: { stores: fixtures } });
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(
+    page.getByRole("button", { name: "分享省钱线索" }),
+  ).toBeDisabled();
+  release();
+  await page.getByRole("button", { name: "分享省钱线索" }).click();
+  await expect(page.getByLabel("一句话线索")).toBeVisible();
+  await expect(page.getByLabel("门店", { exact: true })).not.toHaveValue("");
 });
