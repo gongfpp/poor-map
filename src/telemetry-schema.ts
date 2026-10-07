@@ -1,4 +1,7 @@
 export const eventNames = [
+  "store_create_start",
+  "store_create_success",
+  "map_pick",
   "page_view",
   "page_exit",
   "control_click",

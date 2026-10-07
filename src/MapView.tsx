@@ -1,3 +1,4 @@
+import TiandituMapView from "./TiandituMapView";
 import { track } from "./telemetry";
 import { useEffect, useRef, useState } from "react";
 import { LocateFixed, Minus, Plus, RotateCcw } from "lucide-react";
@@ -41,7 +42,10 @@ function loadSdk(key: string, serviceHost?: string) {
     });
   return sdkPromise;
 }
-type Props = {
+export type MapProps = {
+  provider?: "amap" | "tianditu";
+  onPickLocation?: (point: [number, number]) => void;
+  onReadyChange?: (ready: boolean) => void;
   stores: Store[];
   center: [number, number];
   selected: string | null;
@@ -58,7 +62,7 @@ type Props = {
   markerLabels?: Record<string, string>;
   serviceHost?: string;
 };
-export default function MapView({
+function LegacyMapView({
   stores,
   center,
   selected,
@@ -74,7 +78,7 @@ export default function MapView({
   waterMode = false,
   markerLabels,
   serviceHost,
-}: Props) {
+}: MapProps) {
   const host = useRef<HTMLDivElement>(null),
     map = useRef<any>(null),
     markers = useRef<any[]>([]),
@@ -462,5 +466,13 @@ export default function MapView({
         )}
       </div>
     </div>
+  );
+}
+
+export default function MapView(props: MapProps) {
+  return props.provider === "tianditu" && props.mapReady && !props.demo ? (
+    <TiandituMapView {...props} />
+  ) : (
+    <LegacyMapView {...props} />
   );
 }

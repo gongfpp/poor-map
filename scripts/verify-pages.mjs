@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
-import { chromium } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 import { preview } from "vite";
 const remoteUrl = process.argv[2];
 const server = remoteUrl
@@ -35,49 +35,65 @@ try {
       apiRequests = [];
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => {
-      if (m.type() === "error") errors.push(m.text());
+      if (m.type() === "error")
+        errors.push(m.text().replace(/[a-f0-9]{32}/gi, "[REDACTED]"));
     });
     page.on("response", (r) => {
       if (r.status() >= 400)
-        badResponses.push({ url: r.url(), status: r.status() });
+        badResponses.push({
+          url: r.url().replace(/[a-f0-9]{32}/gi, "[REDACTED]"),
+          status: r.status(),
+        });
     });
     page.on("request", (r) => {
       if (/\/api\/|\/_AMapService\//.test(r.url())) apiRequests.push(r.url());
     });
-    await page.goto(url);
-    await page.locator(".store-card").first().waitFor();
-    assert.equal(await page.locator(".store-card").count(), 6);
+    if (!remoteUrl) {
+      // Read-only bridge for a random-port local static preview; production CORS stays narrow.
+      await page.route(
+        /^https:\/\/poor-map-api\.gong7968\.workers\.dev\/api\/(water\/config|community\/stores)/,
+        async (r) => {
+          const upstream = await fetch(r.request().url());
+          await r.fulfill({
+            status: upstream.status,
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": new URL(url).origin,
+            },
+            body: await upstream.text(),
+          });
+        },
+      );
+    }
+    await page.goto(url, { waitUntil: "domcontentloaded" });
+    await page.locator(".store-card").first().waitFor({ state: "attached" });
+    const count = await page.locator(".store-card").count();
+    assert.ok(count >= 1);
+    if (name === "mobile")
+      await page.getByRole("button", { name: "看列表", exact: true }).click();
+    assert.ok(!(await page.locator(".results").innerText()).includes("演示"));
     await page.getByRole("button", { name: "硬折扣店", exact: true }).click();
-    assert.equal(await page.locator(".store-card").count(), 5);
+    assert.ok((await page.locator(".store-card").count()) >= 1);
     await page.getByRole("button", { name: "全部", exact: true }).click();
     await page
-      .getByRole("button", { name: "收藏 赵一鸣零食 · 街角店", exact: true })
+      .getByRole("button", {
+        name: "收藏 好特卖 · 天一广场东鼓道",
+        exact: true,
+      })
       .click();
-    await page.reload();
-    await page.getByRole("button", { name: /我的收藏/ }).click();
-    assert.equal(await page.locator(".store-card").count(), 1);
-    await page.getByRole("button", { name: "附近门店", exact: true }).click();
-    await page.getByRole("button", { name: "蜜雪冰城", exact: true }).click();
-    assert.equal(await page.locator(".store-card").count(), 1);
-    assert.equal(await page.getByLabel("价格上限").count(), 0);
+    await page.reload({ waitUntil: "domcontentloaded" });
     if (name === "mobile")
-      await page.getByRole("button", { name: /看地图/ }).click();
-    await page
-      .getByRole("button", { name: "数据接入说明", exact: true })
-      .click();
-    assert.ok(
-      (await page.getByRole("dialog").innerText()).includes(
-        "首页门店仍为演示数据",
-      ),
-    );
-    assert.ok(
-      !(await page.getByRole("dialog").innerText()).includes(
-        "无法连接本地 API",
-      ),
-    );
+      await page.getByRole("button", { name: "看列表", exact: true }).click();
+    await page.getByRole("button", { name: "我的收藏", exact: true }).click();
+    await expect(page.locator(".store-card")).toHaveCount(1);
+    assert.equal(await page.getByLabel("价格上限").count(), 0);
+    await page.getByRole("button", { name: "数据来源与配置" }).click();
+    assert.ok((await page.getByRole("dialog").innerText()).includes("天地图"));
     await page.keyboard.press("Escape");
     await page.locator(".brand").click();
-    await page.locator(".store-card").first().waitFor();
+    if (name === "mobile")
+      await page.getByRole("button", { name: "看列表", exact: true }).click();
+    await page.locator(".store-card").first().waitFor({ state: "attached" });
     assert.equal(new URL(page.url()).pathname, "/poor-map/");
     assert.ok(
       await page.evaluate(
@@ -92,7 +108,7 @@ try {
       apiRequests.every(
         (u) =>
           u.startsWith("https://poor-map-api.gong7968.workers.dev/") &&
-          /\/api\/(analytics|community)\//.test(u),
+          /\/api\/(analytics|community|water)\//.test(u),
       ),
     );
     assert.deepEqual(errors, []);

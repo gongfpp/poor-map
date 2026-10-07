@@ -8,6 +8,7 @@ export type Store = {
   address: string;
   location: [number, number];
   tags: string[];
+  locationPrecision?: "poi" | "area";
   price?: number;
   priceNote?: string;
   source: "demo" | "amap" | "community";
@@ -239,4 +240,17 @@ export function wgs84ToGcj02([lng, lat]: [number, number]): [number, number] {
       (dlat * 180) /
         (((6378245 * (1 - 0.006693421622965943)) / (magic * sqrt)) * pi),
   ];
+}
+
+// The stored contract remains GCJ-02; inverse conversion is for geographic basemaps only.
+export function gcj02ToWgs84(point: [number, number]): [number, number] {
+  let estimate: [number, number] = [...point];
+  for (let i = 0; i < 6; i++) {
+    const projected = wgs84ToGcj02(estimate);
+    estimate = [
+      estimate[0] + point[0] - projected[0],
+      estimate[1] + point[1] - projected[1],
+    ];
+  }
+  return estimate;
 }

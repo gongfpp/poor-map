@@ -119,13 +119,17 @@ export async function route(req, env) {
       return output({ error: "请从穷鬼地图页面提交。" }, 403);
     return communityRoute(req, env, scope, { isQA, rate, body, output });
   }
-  if (path === "/api/water/config" && req.method === "GET")
+  if (path === "/api/water/config" && req.method === "GET") {
+    const td =
+      env.TIANDITU_WEB_KEY && url.searchParams.get("map") === "tianditu";
     return output({
-      jsKey: env.AMAP_JS_KEY || "",
-      mapReady: !!(env.AMAP_JS_KEY && env.AMAP_JS_SECURITY_CODE),
+      provider: td ? "tianditu" : "amap",
+      jsKey: (td ? env.TIANDITU_WEB_KEY : env.AMAP_JS_KEY) || "",
+      mapReady: !!td || !!(env.AMAP_JS_KEY && env.AMAP_JS_SECURITY_CODE),
       searchReady: !!env.AMAP_WEB_SERVICE_KEY,
       shared: true,
     });
+  }
   if (path === "/api/water/health")
     return output({
       ok: true,

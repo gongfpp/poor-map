@@ -1,0 +1,43 @@
+.td-map {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: #f4f3ef;
+}
+.td-canvas .map-controls,
+.td-canvas .map-source,
+.td-canvas .map-error {
+  z-index: 900;
+}
+.td-marker .pin {
+  position: static;
+  transform: none;
+}
+.td-marker {
+  background: none;
+  border: none;
+}
+.td-map .leaflet-control-attribution {
+  font-size: 10px;
+  max-width: calc(100vw - 20px);
+  background: rgba(255, 255, 255, 0.9);
+}
+.td-canvas .map-source {
+  bottom: 34px;
+}
+.td-map .leaflet-bottom {
+  z-index: 800;
+}
+.td-map .leaflet-control a {
+  color: #565060;
+}
+@media (max-width: 799px) {
+  .td-canvas .map-source {
+    bottom: 37px;
+  }
+}
+/* Contain Leaflet's internal 200–900 layer stack below dialogs and drawers. */
+.td-canvas {
+  isolation: isolate;
+  z-index: 0;
+}

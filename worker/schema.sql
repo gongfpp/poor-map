@@ -8,3 +8,5 @@ CREATE TABLE IF NOT EXISTS comments (scope TEXT NOT NULL, id TEXT NOT NULL, stor
 CREATE INDEX IF NOT EXISTS comments_store ON comments(scope,store_id,created_at);
 CREATE TABLE IF NOT EXISTS analytics_events (scope TEXT NOT NULL, id TEXT NOT NULL, session_id TEXT NOT NULL, page TEXT NOT NULL, name TEXT NOT NULL, properties TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(scope,id));
 CREATE INDEX IF NOT EXISTS analytics_time ON analytics_events(scope,created_at);
+
+CREATE TABLE IF NOT EXISTS stores (scope TEXT NOT NULL,id TEXT NOT NULL,record TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(scope,id));

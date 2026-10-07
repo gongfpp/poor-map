@@ -7,7 +7,7 @@
 | 大陆地图、位置与 POI | [高德 JS 安全密钥](https://lbs.amap.com/api/javascript-api-v2/guide/abc/jscode)、[POI 搜索](https://developer.amap.com/api/webservice/guide/api/search/)、[JS API 参考](https://a.amap.com/jsapi/static/doc/index.html) | 高德 JS API 2.0 + Web 服务 v3 周边查询；需要 JS Key、安全密钥与 Web 服务 Key。官方支持服务器代理，安全密钥不返回前端。           |
 | 美团 / 大众点评活动  | [旧北极星平台迁移公告](https://open.dianping.com/)、[美团技术服务合作中心](https://developer.meituan.com/)、[商家履约示例文档](https://developer.meituan.com/docs/api/ddzhkh-generalreserve-reserve-merchantfullfill)   | 公告要求转往技术服务合作中心申请合作；已查看的业务接口要求业务授权。未查到能够据此实现全城霸王餐聚合的公开授权路径，因此未接入。 |
 | 抖音生活服务商品     | [商品发布和查询能力](https://partner.open-douyin.com/docs/resource/zh-CN/local-life/develop/capability/basic/goods-introduce)                                                                                           | 需要平台接入及商品查询能力，查询范围与本应用或绑定账号有关。不能据此承诺开放式查询附近所有活动，当前未接入。                     |
-| 用户优惠线索         | 页面投稿与 `src/domain.ts`                                                                                                                                                                                              | 一句话共享评论和回复纠错，无需结构化活动字段；保存在D1，均未核验，不构成平台聚合。                                 |
+| 用户优惠线索         | 页面投稿与 `src/domain.ts`                                                                                                                                                                                              | 一句话共享评论和回复纠错，无需结构化活动字段；保存在D1，均未核验，不构成平台聚合。                                               |
 
 ## 值得纳入的“穷鬼”场景
 
@@ -35,3 +35,5 @@
 5. 在真实大陆网络、真实设备上验收地图加载、定位、门店查询、实际可访问的活动原页以及失败重试，再考虑对外发布。
 
 首页当前包含前端交互、代理和查询代码、共享一句话评论与测试；便宜水另有已部署的共享数据服务。以上是下一阶段的依赖和验收条件，没有创建定时抓取或跨平台后台。
+
+2026-10-08地图显示改为Leaflet+天地图官方矢量/注记瓦片；个人开发者认证与浏览器应用已通过，控制台给出矢量及注记各10,000次/日。已阅读官网[服务条款](https://www.tianditu.gov.cn/about/service)，没有购买收费服务。账户配额与授予的Key是当前实际配置依据，不宣称无额度限制、广告/商业授权或全平台活动授权。首页门店改为用户提供的真实共享标记，不再使用默认演示数据，位置精度以标注为准。

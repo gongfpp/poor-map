@@ -152,3 +152,33 @@
 .app-shell .sidebar {
   z-index: 5;
 }
+.store-form {
+  display: grid;
+  gap: 16px;
+}
+.store-form label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+}
+.store-form input,
+.store-form select {
+  width: 100%;
+  border: 1px solid #e2ddec;
+  border-radius: 7px;
+  padding: 11px;
+  font: inherit;
+}
+.store-form button {
+  justify-content: center;
+}
+.td-canvas .map-source,
+.water-map-wrap .td-canvas .map-source,
+.app-shell .td-canvas .map-source {
+  bottom: 35px;
+}
+.td-map .leaflet-control-attribution {
+  display: block !important;
+  position: relative;
+  z-index: 950;
+}

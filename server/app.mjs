@@ -100,8 +100,11 @@ export function createApp({ env = process.env, upstream = fetch } = {}) {
   };
   app.get("/api/config", (req, res) =>
     res.json({
-      jsKey: env.AMAP_JS_KEY || "",
-      mapReady: !!(env.AMAP_JS_KEY && env.AMAP_JS_SECURITY_CODE),
+      provider: env.TIANDITU_WEB_KEY ? "tianditu" : "amap",
+      jsKey: env.TIANDITU_WEB_KEY || env.AMAP_JS_KEY || "",
+      mapReady:
+        !!env.TIANDITU_WEB_KEY ||
+        !!(env.AMAP_JS_KEY && env.AMAP_JS_SECURITY_CODE),
       searchReady: !!env.AMAP_WEB_SERVICE_KEY,
       providers: [
         {

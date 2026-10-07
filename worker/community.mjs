@@ -1,3 +1,4 @@
+import { seedStores, validateStore } from "../src/store-domain.ts";
 import { eventNames, cleanProperties } from "../src/telemetry-schema.ts";
 export async function communityRoute(
   req,
@@ -10,11 +11,58 @@ export async function communityRoute(
   if (path === "/api/community/qa" && req.method === "DELETE") {
     if (!isQA) return output({ error: "未授权。" }, 403);
     await env.DB.batch(
-      ["comments", "analytics_events"].map((t) =>
+      ["comments", "analytics_events", "stores"].map((t) =>
         env.DB.prepare(`DELETE FROM ${t} WHERE scope=?`).bind(scope),
       ),
     );
     return output({ ok: true });
+  }
+  if (path === "/api/community/stores") {
+    if (req.method === "GET") {
+      if (scope === "public")
+        await env.DB.batch(
+          seedStores.map((s) =>
+            env.DB.prepare(
+              "INSERT OR IGNORE INTO stores(scope,id,record,created_at) VALUES(?,?,?,?)",
+            ).bind(scope, s.id, JSON.stringify(s), s.createdAt),
+          ),
+        );
+      const rows = await env.DB.prepare(
+        "SELECT record FROM stores WHERE scope=? ORDER BY created_at DESC LIMIT 1000",
+      )
+        .bind(scope)
+        .all();
+      return output({ stores: rows.results.map((r) => JSON.parse(r.record)) });
+    }
+    if (req.method === "POST") {
+      if (!(await rate(req, env, scope, 20, "community")))
+        return output({ error: "标记较频繁，请稍后重试。" }, 429);
+      const raw = await body(req),
+        input = {
+          name: raw.name,
+          category: raw.category,
+          address: raw.address,
+          location: raw.location,
+        },
+        issue = validateStore(input);
+      if (issue) return output({ error: issue }, 400);
+      const store = {
+        ...input,
+        name: input.name.trim(),
+        address: input.address.trim(),
+        id: crypto.randomUUID(),
+        tags: [],
+        source: "community",
+        locationPrecision: "poi",
+        createdAt: new Date().toISOString(),
+      };
+      await env.DB.prepare(
+        "INSERT INTO stores(scope,id,record,created_at) VALUES(?,?,?,?)",
+      )
+        .bind(scope, store.id, JSON.stringify(store), store.createdAt)
+        .run();
+      return output({ store }, 201);
+    }
   }
   if (path === "/api/community/comments") {
     if (req.method === "GET") {

@@ -95,6 +95,7 @@ export default function WaterPage() {
     [refresh, setRefresh] = useState(0),
     [tick, setTick] = useState(0);
   const [config, setConfig] = useState({
+      provider: "amap" as "amap" | "tianditu",
       jsKey: "",
       mapReady: false,
       searchReady: false,
@@ -198,7 +199,7 @@ export default function WaterPage() {
   }, [refresh]);
   useEffect(() => {
     const controller = new AbortController();
-    api("/config", { signal: controller.signal })
+    api("/config?map=tianditu", { signal: controller.signal })
       .then((data) => {
         setConfig(data);
         if (!data.searchReady)
@@ -711,6 +712,7 @@ export default function WaterPage() {
               selected={selectedOffer?.storeId || null}
               onSelect={chooseStore}
               demo={false}
+              provider={config.provider}
               jsKey={config.jsKey}
               mapReady={config.mapReady}
               onLocate={locate}
@@ -733,7 +735,7 @@ export default function WaterPage() {
           <div className="water-map-caption">
             {config.mapReady
               ? "社区线索 · 未核验"
-              : "坐标示意 · 高德底图待开通"}
+              : "底图暂不可用 · 保留价格线索"}
           </div>
           {selectedOffer && (
             <div className="water-map-selected">

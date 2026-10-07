@@ -29,6 +29,19 @@ test.beforeEach(async ({ page, request }, info) => {
     }),
   );
 });
+// General water CRUD scenarios use the real isolated local database, without spending basemap quota.
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/water/config*", (r) =>
+    r.fulfill({
+      json: {
+        provider: "tianditu",
+        jsKey: "",
+        mapReady: false,
+        searchReady: false,
+      },
+    }),
+  );
+});
 test.afterEach(async ({ request }) => {
   await request.delete("/api/water/qa", {
     headers: { "X-QA-Token": token, "X-QA-Scope": scope },

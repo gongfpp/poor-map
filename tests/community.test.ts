@@ -218,3 +218,85 @@ test("telemetry strips URLs, coordinates, arbitrary strings and unbounded values
     { action: "save", count: 5, enabled: true },
   );
 });
+
+test("store markers require an explicit valid location and remain isolated", async () => {
+  const DB = createWaterDB(),
+    env = { DB, QA_TOKEN: "private" },
+    headers = { "x-qa-token": "private", "x-qa-scope": "store-test" };
+  try {
+    const publicBefore = await (
+      await worker.fetch(request("/api/community/stores"), env)
+    ).json();
+    assert.equal(publicBefore.stores.length, 1);
+    assert.ok(publicBefore.stores.every((s: any) => s.source !== "demo"));
+    assert.equal(publicBefore.stores[0].locationPrecision, "area");
+    const input = {
+      name: "测试蜜雪冰城",
+      category: "mixue",
+      address: "测试地址",
+      location: [121.552, 29.873],
+    };
+    const r = await worker.fetch(
+      request("/api/community/stores", "POST", input, headers),
+      env,
+    );
+    assert.equal(r.status, 201);
+    assert.equal((await r.json()).store.category, "mixue");
+    assert.equal(
+      (
+        await worker.fetch(
+          request(
+            "/api/community/stores",
+            "POST",
+            { ...input, location: null },
+            headers,
+          ),
+          env,
+        )
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await worker.fetch(
+          request(
+            "/api/community/stores",
+            "POST",
+            { ...input, category: "meal" },
+            headers,
+          ),
+          env,
+        )
+      ).status,
+      400,
+    );
+    const qa = await (
+      await worker.fetch(
+        request("/api/community/stores", "GET", undefined, headers),
+        env,
+      )
+    ).json();
+    assert.equal(qa.stores.length, 1);
+    const after = await (
+      await worker.fetch(request("/api/community/stores"), env)
+    ).json();
+    assert.equal(after.stores.length, 1);
+    await worker.fetch(
+      request("/api/community/qa", "DELETE", undefined, headers),
+      env,
+    );
+    assert.equal(
+      (
+        await (
+          await worker.fetch(
+            request("/api/community/stores", "GET", undefined, headers),
+            env,
+          )
+        ).json()
+      ).stores.length,
+      0,
+    );
+  } finally {
+    DB.close();
+  }
+});

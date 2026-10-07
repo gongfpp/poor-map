@@ -28,6 +28,12 @@ const headers = {
   };
 let browser;
 try {
+  await call("/api/community/stores", "POST", {
+    name: "隔离验收好特卖",
+    category: "discount",
+    address: "验收隔离数据",
+    location: [121.5549, 29.8731],
+  });
   browser = await chromium.launch({ channel: "chrome" });
   const first = await browser.newContext(),
     second = await browser.newContext(),
@@ -39,7 +45,7 @@ try {
   const a = await first.newPage(),
     b = await second.newPage();
   for (const p of [a, b]) p.on("pageerror", (e) => errors.push(e.message));
-  await a.goto(url);
+  await a.goto(url, { waitUntil: "domcontentloaded" });
   await a.locator(".store-card").first().waitFor();
   await a.getByRole("button", { name: "分享省钱线索" }).click();
   await a.getByLabel("一句话线索").fill("隔离验收：今天水价0.9元");
@@ -48,7 +54,7 @@ try {
   ).toBeEnabled();
   await a.getByRole("button", { name: "分享", exact: true }).click();
   await expect(a.locator(".community-comment")).toHaveCount(1);
-  await b.goto(url);
+  await b.goto(url, { waitUntil: "domcontentloaded" });
   await b.getByRole("button", { name: "分享省钱线索" }).click();
   await expect(b.locator(".community-comment")).toContainText("隔离验收");
   await b.getByRole("button", { name: "回复 / 纠错" }).click();

@@ -25,9 +25,8 @@ import {
   distanceText,
   type Store,
 } from "./domain";
-import { demoData } from "./data";
 import MapView from "./MapView";
-import { STATIC_DEMO } from "./config";
+import { STATIC_DEMO, WATER_API } from "./config";
 import Modal from "./Modal";
 import { currentLocation } from "./location";
 import Comments from "./Comments";
@@ -43,11 +42,13 @@ function readSaved(): string[] {
 }
 export default function App() {
   const [config, setConfig] = useState({
+      provider: "amap" as "amap" | "tianditu",
       jsKey: "",
       mapReady: false,
       searchReady: false,
     }),
-    [demo, setDemo] = useState(true),
+    [tileReady, setTileReady] = useState(false),
+    [demo] = useState(false),
     [city, setCity] = useState("宁波"),
     [center, setCenter] = useState<[number, number]>(cities[0].center),
     [draftCenter, setDraftCenter] = useState<[number, number] | null>(null),
@@ -58,13 +59,17 @@ export default function App() {
     [saved, setSaved] = useState(readSaved),
     [live, setLive] = useState<Store[]>([]),
     [selected, setSelected] = useState<string | null>(null),
-    [modal, setModal] = useState<"city" | "config" | "report" | null>(null),
-    [mobileMap, setMobileMap] = useState(false),
+    [modal, setModal] = useState<"city" | "config" | "report" | "store" | null>(
+      null,
+    ),
+    [mobileMap, setMobileMap] = useState(() => innerWidth < 800),
     [loading, setLoading] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [refresh, setRefresh] = useState(0),
     [locating, setLocating] = useState(false),
+    [picking, setPicking] = useState(false),
+    [storePoint, setStorePoint] = useState<[number, number] | null>(null),
     [place, setPlace] = useState(""),
     [placeBusy, setPlaceBusy] = useState(false),
     [sharingStore, setSharingStore] = useState(""),
@@ -87,39 +92,20 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
-    if (STATIC_DEMO) return;
     const c = new AbortController();
-    fetch("/api/config", { signal: c.signal })
-      .then((r) => r.json())
+    fetch(`${WATER_API}/api/water/config?map=tianditu`, { signal: c.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
       .then(setConfig)
-      .catch(() => {});
+      .catch((e) => {
+        if (e.name !== "AbortError")
+          setNotice("底图配置暂时无法连接，稍后刷新重试。");
+      });
     return () => c.abort();
-  }, []);
-  const sample = useMemo(
-    () =>
-      demoData(
-        center,
-        cities.some((c) => c.name === city) ? city : "current-area",
-      )
-        .stores.filter(
-          (s) =>
-            s.category === "snack" ||
-            s.category === "discount" ||
-            s.name.startsWith("蜜雪冰城"),
-        )
-        .map(
-          (s) =>
-            ({
-              ...s,
-              category: s.name.startsWith("蜜雪冰城") ? "mixue" : "discount",
-              tags: [],
-              price: undefined,
-              priceNote: undefined,
-            }) as Store,
-        ),
-    [center, city],
-  );
-  const stores = demo ? sample : live;
+  }, [refresh]);
+  const stores = live;
   const visible = useMemo(
     () =>
       stores
@@ -146,10 +132,7 @@ export default function App() {
     setError("");
     setLive([]);
     track("query_start", { category, radius });
-    fetch(
-      `/api/nearby?center=${center.join(",")}&radius=${radius}&category=${category}`,
-      { signal: c.signal },
-    )
+    fetch(`${WATER_API}/api/community/stores`, { signal: c.signal })
       .then(async (r) => {
         const d = await r.json();
         if (!r.ok) throw new Error(d.error);
@@ -166,7 +149,7 @@ export default function App() {
         if (!c.signal.aborted) setLoading(false);
       });
     return () => c.abort();
-  }, [demo, center, radius, category, refresh]);
+  }, [demo, refresh]);
   useEffect(() => {
     const timer = setTimeout(
       () =>
@@ -254,24 +237,14 @@ export default function App() {
     }
     track("navigation_open");
     window.open(
-      `https://uri.amap.com/marker?position=${s.location.join(",")}&name=${encodeURIComponent(s.name)}&coordinate=gaode&callnative=1`,
+      `https://uri.amap.com/marker?position=${s.location.join(",")}&name=${encodeURIComponent(s.name + (s.locationPrecision === "area" ? "（商圈参考位置）" : ""))}&coordinate=gaode&callnative=1`,
       "_blank",
       "noopener,noreferrer",
     );
   }
   function share() {
-    setSharingStore(selected || visible[0]?.id || "");
+    setSharingStore(selected || visible[0]?.id || stores[0]?.id || "");
     open("report");
-  }
-  function mode() {
-    if (STATIC_DEMO || !config.searchReady) {
-      open("config");
-      return;
-    }
-    setDemo(!demo);
-    setSelected(null);
-    setFeed("nearby");
-    track("mode_change", { mode: demo ? "live" : "demo" });
   }
   async function searchPlace(e: React.FormEvent) {
     e.preventDefault();
@@ -305,6 +278,21 @@ export default function App() {
           <span>穷鬼地图</span>
         </a>
         <div className="header-actions">
+          <button
+            className="header-link"
+            aria-label="标记门店"
+            disabled={!tileReady}
+            onClick={() => {
+              track("store_create_start");
+              setPicking(true);
+              setMobileMap(true);
+              setSelected(null);
+              setNotice("请点击地图上的门店位置。");
+            }}
+          >
+            <MapPin size={18} />
+            <span>标记门店</span>
+          </button>
           <a className="water-nav" href="#/water" data-track="water">
             便宜水
           </a>
@@ -457,7 +445,9 @@ export default function App() {
                 <h3>
                   {feed === "saved" ? "当前范围暂无收藏" : "没有匹配的门店"}
                 </h3>
-                <p>试试扩大范围或清空搜索。</p>
+                <p>
+                  这一带还没有匹配的门店标记。可以扩大范围、先看宁波，或标记你知道的店。
+                </p>
                 <button
                   className="secondary-button"
                   onClick={() => {
@@ -468,6 +458,18 @@ export default function App() {
                   }}
                 >
                   重置筛选
+                </button>
+                <button
+                  className="secondary-button"
+                  onClick={() => {
+                    pick(cities[0].center, "宁波");
+                    setCategory("all");
+                    setQuery("");
+                    setRadius(3000);
+                    setFeed("nearby");
+                  }}
+                >
+                  看宁波已有门店
                 </button>
               </div>
             )}
@@ -504,6 +506,7 @@ export default function App() {
                           <strong>{s.name}</strong>
                           <span>
                             {cat.label} ·{" "}
+                            {s.locationPrecision === "area" ? "约 " : ""}
                             {distanceText(distance(center, s.location))} · 直线
                             {s.source === "demo" ? " · 演示" : ""}
                           </span>
@@ -527,7 +530,7 @@ export default function App() {
           </div>
           <div className="sidebar-footer">
             <span className={`status-dot ${demo ? "" : "live"}`} />
-            {demo ? "演示门店 · 不能用于出行" : "高德门店"}
+            {demo ? "演示门店 · 不能用于出行" : "共享门店 · 用户标记"}
             <button onClick={() => open("config")}>
               数据说明
               <ExternalLink size={11} />
@@ -552,24 +555,35 @@ export default function App() {
             selected={selected}
             onSelect={select}
             demo={demo}
+            provider={config.provider}
             jsKey={config.jsKey}
             mapReady={config.mapReady}
+            onReadyChange={setTileReady}
+            onPickLocation={
+              picking
+                ? (point) => {
+                    track("map_pick");
+                    setStorePoint(point);
+                    setPicking(false);
+                    open("store");
+                  }
+                : undefined
+            }
             onLocate={locate}
             onMove={(p) => {
               setDraftCenter(p);
               track("map_drag");
             }}
             eventIds={new Set()}
+            radiusMeters={radius}
             canLocate={true}
           />
           <div className="compact-map-status">
-            <span>{demo ? "示例数据" : "高德门店"}</span>
-            <button onClick={mode}>
-              {STATIC_DEMO
-                ? "数据接入说明"
-                : demo
-                  ? "切换真实数据"
-                  : "返回演示"}
+            <span>{picking ? "点地图标记门店" : "共享门店"}</span>
+            <button
+              onClick={() => (picking ? setPicking(false) : open("config"))}
+            >
+              {picking ? "取消" : "数据说明"}
             </button>
           </div>
           {draftCenter && (
@@ -590,7 +604,8 @@ export default function App() {
                     activeCategories.find((c) => c.id === current.category)
                       ?.label
                   }{" "}
-                  · {current.source === "demo" ? "演示门店" : "高德 POI"}
+                  ·{" "}
+                  {current.source === "demo" ? "演示门店" : "用户标记 · 未核验"}
                 </span>
                 <button
                   className="icon-button"
@@ -606,7 +621,8 @@ export default function App() {
               <h3>{current.name}</h3>
               <p className="detail-address">
                 <MapPin size={14} />
-                {current.address}
+                {current.address || "地址待补充"}
+                {current.locationPrecision === "area" && " · 商圈参考位置"}
               </p>
               <div className="detail-actions">
                 <button
@@ -621,7 +637,9 @@ export default function App() {
                   onClick={() => navigate(current)}
                 >
                   <Navigation size={16} />
-                  到这里去
+                  {current.locationPrecision === "area"
+                    ? "查看参考位置"
+                    : "到这里去"}
                 </button>
                 <button
                   className="icon-button"
@@ -746,22 +764,49 @@ export default function App() {
           )}
         </Modal>
       )}
+      {modal === "store" && storePoint && (
+        <Modal title="标记一家门店" onClose={() => open(null)}>
+          <StoreForm
+            point={storePoint}
+            onRepick={() => {
+              open(null);
+              setPicking(true);
+              setMobileMap(true);
+            }}
+            onSave={(store) => {
+              setLive((v) => [store, ...v]);
+              pick(store.location, "新门店附近");
+              setSelected(store.id);
+              setFeed("nearby");
+              setCategory("all");
+              setQuery("");
+              open(null);
+              setMobileMap(true);
+              setNotice("已保存共享门店，点击详情可分享一句话线索。");
+            }}
+          />
+        </Modal>
+      )}
       {modal === "config" && (
         <Modal title="数据从哪里来？" onClose={() => open(null)}>
           <p className="modal-copy">
-            {STATIC_DEMO
-              ? "首页门店仍为演示数据，便宜水和评论使用真实共享库。"
-              : "高德免费 Key 当前仅用于本地少量测试。"}{" "}
+            底图来自天地图；门店、评论和水价来自共享线索库。当前收录仍少，分类不能证明当前商品价格或库存。
             收藏保存在当前浏览器；评论公开保存并允许回复纠错，均为未核验线索。
           </p>
           <div className="provider-row">
-            <span>高德 JS 地图</span>
-            <b>
-              {config.mapReady ? "已配置 · 本地测试" : "公开接入待许可确认"}
-            </b>
+            <span>天地图道路底图</span>
+            <b>{config.mapReady ? "已配置" : "暂不可用"}</b>
           </div>
+          {!config.mapReady && (
+            <button
+              className="secondary-button"
+              onClick={() => setRefresh((n) => n + 1)}
+            >
+              重新加载底图配置
+            </button>
+          )}
           <div className="provider-row">
-            <span>高德周边门店</span>
+            <span>自动门店检索</span>
             <b>{config.searchReady ? "已配置 · 本地测试" : "未接入"}</b>
           </div>
           <div className="provider-row">
@@ -769,8 +814,7 @@ export default function App() {
             <b>未接入</b>
           </div>
           <p className="form-hint">
-            免费测试配额不等于公开使用授权。安全密钥和 Web 服务 Key
-            只保留在服务端。
+            门店位置与线索由用户提供，欢迎回复补充和纠错。商圈参考位置不能等同于准确铺位。
           </p>
           <div className="privacy-control">
             <h3>使用统计</h3>
@@ -790,20 +834,88 @@ export default function App() {
               允许匿名使用统计
             </label>
           </div>
-          {!STATIC_DEMO && config.searchReady && (
-            <button
-              className="primary-button full-width"
-              onClick={() => {
-                setDemo(false);
-                setFeed("nearby");
-                open(null);
-              }}
-            >
-              开始查询真实门店
-            </button>
-          )}
         </Modal>
       )}
     </div>
+  );
+}
+
+function StoreForm({
+  point,
+  onRepick,
+  onSave,
+}: {
+  point: [number, number];
+  onRepick: () => void;
+  onSave: (s: Store) => void;
+}) {
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    setBusy(true);
+    setError("");
+    try {
+      const r = await fetch(`${WATER_API}/api/community/stores`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(15000),
+          body: JSON.stringify({
+            name: form.get("name"),
+            category: form.get("category"),
+            address: form.get("address"),
+            location: point,
+          }),
+        }),
+        d = await r.json();
+      if (!r.ok) throw new Error(d.error || "保存失败，请重试。");
+      onSave(d.store);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <form className="store-form" onSubmit={submit}>
+      <label>
+        门店名称
+        <input
+          name="name"
+          required
+          minLength={2}
+          maxLength={80}
+          placeholder="例如：赵一鸣零食·鼓楼店"
+        />
+      </label>
+      <label>
+        分类
+        <select name="category" aria-label="分类">
+          <option value="discount">硬折扣店（含量贩零食）</option>
+          <option value="mixue">蜜雪冰城</option>
+        </select>
+      </label>
+      <label>
+        地址补充（可选）
+        <input
+          name="address"
+          maxLength={200}
+          placeholder="楼层、入口或附近标志物"
+        />
+      </label>
+      <p className="form-hint">位置已在地图上选择，提交后公开显示。</p>
+      <button type="button" className="secondary-button" onClick={onRepick}>
+        重新选点
+      </button>
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      <button className="primary-button" disabled={busy}>
+        {busy ? "保存中…" : "保存门店"}
+      </button>
+    </form>
   );
 }

@@ -51,7 +51,7 @@ try {
       {
         sourceSha,
         builtAt: new Date().toISOString(),
-        mode: "pages-with-live-water",
+        mode: "pages-with-live-community",
       },
       null,
       2,
