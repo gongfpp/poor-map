@@ -1,5 +1,5 @@
 import type { Store, Deal } from "./domain";
-export function demoData(center: [number, number]) {
+export function demoData(center: [number, number], scope = "city") {
   const entries: [
     string,
     Store["category"],
@@ -120,7 +120,7 @@ export function demoData(center: [number, number]) {
   ];
   const stores: Store[] = entries.map(
     ([name, category, x, y, price, priceNote, tags], i) => ({
-      id: `demo-${center.join(",")}-${i}`,
+      id: `demo-${scope}-${i}`,
       name,
       category,
       location: [center[0] + x, center[1] + y],

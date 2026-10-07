@@ -1,6 +1,9 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
+import waterWorker from "../worker/index.mjs";
+import { getWaterDB } from "./water-db.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const groups = [
   ["snack", "赵一鸣零食|零食很忙|零食有鸣|零食折扣"],
@@ -21,6 +24,14 @@ export function createApp({ env = process.env, upstream = fetch } = {}) {
     next();
   });
   app.use(["/api", "/_AMapService"], (req, res, next) => {
+    if (
+      env.QA_TOKEN &&
+      req.originalUrl.startsWith("/api/water") &&
+      req.get("X-QA-Token") === env.QA_TOKEN
+    ) {
+      next();
+      return;
+    }
     const now = Date.now(),
       key = req.ip,
       entry = limits.get(key);
@@ -33,6 +44,43 @@ export function createApp({ env = process.env, upstream = fetch } = {}) {
         if (now - item.start > 60000) limits.delete(ip);
     res.set("Cache-Control", "no-store");
     next();
+  });
+  const waterGuard = randomUUID();
+  app.use("/api/water", async (req, res) => {
+    try {
+      const chunks = [];
+      let bytes = 0;
+      for await (const chunk of req) {
+        bytes += chunk.length;
+        if (bytes > 8192) {
+          res.status(413).json({ error: "内容过长。" });
+          return;
+        }
+        chunks.push(chunk);
+      }
+      const body = Buffer.concat(chunks).toString("utf8");
+      const headers = new Headers();
+      for (const [key, value] of Object.entries(req.headers))
+        if (typeof value === "string") headers.set(key, value);
+      headers.set("cf-connecting-ip", req.ip || "local");
+      const request = new Request("http://127.0.0.1" + req.originalUrl, {
+        method: req.method,
+        headers,
+        ...(!["GET", "HEAD"].includes(req.method) && body ? { body } : {}),
+      });
+      const response = await waterWorker.fetch(request, {
+        ...env,
+        DB: getWaterDB(),
+        QA_TOKEN: env.QA_TOKEN || waterGuard,
+        STORAGE_KIND: "SQLite",
+      });
+      response.headers.forEach((v, k) => res.set(k, v));
+      res
+        .status(response.status)
+        .send(Buffer.from(await response.arrayBuffer()));
+    } catch {
+      res.status(503).json({ error: "水价服务暂时不可用。" });
+    }
   });
   const get = async (endpoint, params) => {
     const url = new URL(`https://restapi.amap.com${endpoint}`);
@@ -67,11 +115,9 @@ export function createApp({ env = process.env, upstream = fetch } = {}) {
   );
   app.get("/api/nearby", async (req, res) => {
     if (!env.AMAP_WEB_SERVICE_KEY)
-      return res
-        .status(503)
-        .json({
-          error: "尚未配置高德 Web 服务 Key。请在本地 .env 中配置后重启。",
-        });
+      return res.status(503).json({
+        error: "尚未配置高德 Web 服务 Key。请在本地 .env 中配置后重启。",
+      });
     const center = str(req.query.center).split(",").map(Number),
       radius = Number(req.query.radius || 3000),
       category = str(req.query.category) || "all";

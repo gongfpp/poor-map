@@ -48,7 +48,11 @@ try {
   writeFileSync(
     path.join(directory, "deploy-meta.json"),
     JSON.stringify(
-      { sourceSha, builtAt: new Date().toISOString(), mode: "static-demo" },
+      {
+        sourceSha,
+        builtAt: new Date().toISOString(),
+        mode: "pages-with-live-water",
+      },
       null,
       2,
     ) + "\n",

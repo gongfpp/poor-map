@@ -5,7 +5,9 @@ test("demo shell, categories, search and screenshots", async ({
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("花小钱");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(
+    "穷鬼地图",
+  );
   await expect(page.locator(".store-card")).toHaveCount(12);
   await page.screenshot({
     path: `docs/preview-${info.project.name}.png`,

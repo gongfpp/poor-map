@@ -1,0 +1,8 @@
+{
+  "name":"poor-map-api",
+  "main":"worker/index.mjs",
+  "compatibility_date":"2026-10-07",
+  "workers_dev":true,
+  "d1_databases":[{"binding":"DB","database_name":"poor-map-water","database_id":"0cd49e84-3093-47f8-b66a-61f5413ed16e"}],
+  "observability":{"enabled":false}
+}

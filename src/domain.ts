@@ -9,7 +9,7 @@ export type Store = {
   tags: string[];
   price?: number;
   priceNote?: string;
-  source: "demo" | "amap";
+  source: "demo" | "amap" | "community";
 };
 export type Deal = {
   id: string;

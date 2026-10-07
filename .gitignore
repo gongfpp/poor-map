@@ -1,6 +1,10 @@
 node_modules/
 dist/
 pages-dist/
+.data/
+.wrangler/
+.dev.vars
+.dev.vars.*
 .env
 .env.*
 !.env.example

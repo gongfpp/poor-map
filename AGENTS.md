@@ -10,3 +10,10 @@
 - 公开仓库目标为 `gongfpp/poor-map`；`main` 为源码，`gh-pages` 为持续维护的静态部署产物分支，不按普通已完成任务分支删除。
 - Pages 使用 `npm run build:pages`、`npm run verify:pages` 和 `npm run publish:pages`。静态构建通过 `src/config.ts` 关闭本地 API 请求；线上部署后核对 `deploy-meta.json` 的源码 SHA，并实测桌面与移动页面。
 - 没有获得高德密钥时保留真实地图验收缺口。素材和公开范围见 `PUBLIC_NOTICE.md`，第三方许可随站点一起发布。
+- `#/water` 为真实共享的便宜水页面，事实与边界见 `docs/WATER.md`；两条初始宁波价格来自用户提供，容量、来源平台、日期或店铺精度未知时保持未知。
+- 便宜水由 `worker/index.mjs` + D1 保存，公开 API 为 `poor-map-api.gong7968.workers.dev`；本地使用 `.data/water.sqlite`。`src/water-domain.ts` 负责按升、规格、范围与状态筛选。
+- 高德 Key 当前待账号本人登录后申请；没有实际密钥与成功查询，不把道路底图或候选门店检索标为已接入。
+- `QA_TOKEN` 仅为私密隔离写入验证凭据，不能进入 Pages、Git 或普通日志。验证使用 `qa:<scope>` 数据，不写公开线索；结束清理对应数据集。
+- 浏览器定位在首页与便宜水默认执行，失败时回宁波；不要将精确设备坐标存入演示收藏 ID，门店公开坐标只能来自明确的门店选择或用户输入。
+
+- 界面按地图优先组织：不加 banner、宣传标题或装饰大图；参考 Nearcade 的全屏地图、桌面侧栏和手机底部抽屉逻辑。未知底图状态保持真实标识，不用虚构道路替代便宜水地图。

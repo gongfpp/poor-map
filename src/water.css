@@ -1,0 +1,1223 @@
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.water-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: #eef4f5;
+  color: #477d83;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.water-app {
+  height: 100dvh;
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  background: #f4f5f7;
+  color: #344452;
+  overflow: hidden;
+}
+.water-header {
+  height: 56px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  background: #fff;
+  border-bottom: 1px solid #e5e9ee;
+  gap: 16px;
+  z-index: 15;
+}
+.water-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 18px;
+  font-weight: 750;
+}
+.water-brand .brand-icon {
+  height: 30px;
+  width: 29px;
+  border-radius: 9px;
+}
+.water-header nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.water-back {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #8b98a4;
+}
+.water-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 9px 12px;
+  border-radius: 6px;
+  background: #477f91;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+.water-primary:hover {
+  background: #396b7b;
+}
+.water-main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.water-map-side {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #f2f4f7;
+}
+.water-map-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+.water-map-wrap .map-canvas {
+  height: 100%;
+  width: 100%;
+}
+.water-map-heading {
+  display: none;
+}
+.water-map-wrap .map-controls {
+  right: 16px;
+  bottom: 62px;
+}
+.water-map-wrap .map-source {
+  left: auto;
+  right: 16px;
+  bottom: 18px;
+  font-size: 9px;
+}
+.water-map-wrap .map-legend {
+  left: auto;
+  right: 16px;
+  bottom: 39px;
+}
+.water-map-wrap .pin {
+  min-width: 67px;
+  width: auto;
+  height: 30px;
+  padding: 0 8px;
+  border-width: 2px;
+  border-radius: 18px;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px #3f526d24;
+}
+.water-map-caption {
+  position: absolute;
+  right: 16px;
+  top: 14px;
+  max-width: 230px;
+  background: #fffffff0;
+  padding: 7px 9px;
+  border: 1px solid #e6e9ef;
+  border-radius: 6px;
+  color: #96a3b0;
+  font-size: 9px;
+  line-height: 1.65;
+  pointer-events: none;
+}
+.water-sidebar {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  bottom: 14px;
+  width: 365px;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #fff;
+  border: 1px solid #dde4ec;
+  border-radius: 10px;
+  box-shadow: 0 4px 18px #3b526f12;
+  overflow: hidden;
+}
+.water-location {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 13px 13px 9px;
+  color: #7196a7;
+  flex-wrap: wrap;
+}
+.water-location > div {
+  flex: 1;
+  min-width: 0;
+  flex-basis: calc(100% - 26px);
+}
+.water-location strong {
+  font-size: 11px;
+  font-weight: 550;
+  color: #899eaa;
+}
+.water-location > button {
+  font-size: 10px;
+  color: #7993a2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 7px;
+  border: 1px solid #e6edf1;
+  border-radius: 5px;
+  background: #fafcfd;
+}
+.water-location > button:nth-last-child(2) {
+  margin-left: 24px;
+}
+.water-toolbox {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 7px 13px 10px;
+  border-bottom: 1px solid #edf1f4;
+  flex-shrink: 0;
+}
+.water-search {
+  grid-column: 1/-1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e4eaf0;
+  border-radius: 7px;
+  padding: 9px 10px;
+  color: #a0afbc;
+  background: #fafbfc;
+}
+.water-search input {
+  border: 0;
+  background: none;
+  font-size: 11px;
+  width: 100%;
+  min-width: 0;
+  outline: none;
+  color: #657b8b;
+}
+.water-search:focus-within {
+  border-color: #a2b9cd;
+}
+.water-pack-tabs {
+  grid-column: 1/-1;
+  display: flex;
+  gap: 3px;
+}
+.water-pack-tabs button {
+  flex: 1;
+  padding: 7px 3px;
+  font-size: 9px;
+  white-space: nowrap;
+  border: 1px solid #e8edf1;
+  border-radius: 5px;
+  color: #a1aeba;
+}
+.water-pack-tabs button.active {
+  background: #edf4f7;
+  color: #608ea2;
+  border-color: #cbdde7;
+  font-weight: 600;
+}
+.water-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 8px;
+  border: 1px solid #e6ebef;
+  border-radius: 5px;
+  color: #9eacb8;
+  font-size: 9px;
+}
+.water-select select {
+  border: 0;
+  background: transparent;
+  color: #7e96a6;
+  font-size: 10px;
+  outline: none;
+  max-width: 120px;
+}
+.water-result-meta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding: 12px 13px 10px;
+  font-size: 9px;
+  color: #a1aebc;
+  flex-shrink: 0;
+}
+.water-result-meta > div:first-child {
+  width: 100%;
+  font-size: 10px;
+  color: #9aaaba;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.water-result-meta > div > strong {
+  color: #607c90;
+  font-size: 12px;
+}
+.water-result-meta > div > span {
+  margin-left: auto;
+  font-size: 9px;
+}
+.water-result-meta b {
+  color: #608e9c;
+  font-weight: 600;
+}
+.water-result-meta > label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+}
+.water-result-meta input {
+  margin: 0;
+  accent-color: #5b91a5;
+  width: 12px;
+  height: 12px;
+}
+.water-result-meta > button {
+  display: flex;
+  padding: 0;
+  margin-left: auto;
+  color: #a1afbd;
+}
+.water-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #e2e9ef transparent;
+}
+.water-results {
+  padding: 0 10px;
+}
+.water-offer {
+  border: 1px solid #e5ebef;
+  border-radius: 7px;
+  padding: 12px;
+  margin-bottom: 9px;
+  background: #fff;
+}
+.water-offer.selected {
+  border-color: #afc8d7;
+  background: #fbfdff;
+}
+.water-offer-top {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.water-product-icon {
+  width: 31px;
+  height: 32px;
+  border-radius: 7px;
+  background: #eef5f8;
+  color: #84a6be;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.water-product-icon svg {
+  width: 19px;
+}
+.water-offer-top > div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.water-store-name {
+  padding: 0;
+  text-align: left;
+  color: #607c91;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+.water-offer-top > div > span {
+  font-size: 8px;
+  color: #b0bec8;
+}
+.water-origin {
+  font-size: 8px;
+  color: #a8b5a5;
+  background: #f5f7f1;
+  padding: 3px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.water-offer h3 {
+  font-size: 10px;
+  font-weight: 400;
+  color: #91a6b5;
+  margin: 11px 0 8px;
+}
+.water-price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.water-unit-price {
+  font-size: 23px;
+  line-height: 1;
+  font-weight: 700;
+  color: #5d8a9e;
+  letter-spacing: -0.5px;
+}
+.water-unit-price > small:first-child {
+  font-size: 10px;
+  letter-spacing: 0;
+  margin-right: 2px;
+}
+.water-unit-price > span {
+  font-size: 9px;
+  color: #a4b4c1;
+  margin-left: 4px;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+.water-unit-price > em {
+  font-style: normal;
+  font-size: 17px;
+}
+.water-unit-price > small:last-child {
+  display: block;
+  font-size: 8px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.6;
+  margin-top: 7px;
+  color: #b8c4cd;
+}
+.water-unit-price > strong {
+  font-size: 13px;
+  font-weight: 450;
+  color: #a8b9c5;
+  letter-spacing: 0;
+}
+.water-purchase {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.water-purchase b {
+  font-size: 16px;
+  color: #788fa1;
+  font-weight: 650;
+}
+.water-purchase span {
+  font-size: 8px;
+  color: #b6c2cd;
+}
+.water-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin: 7px 0;
+}
+.water-tags > span {
+  font-size: 8px;
+  padding: 3px 4px;
+  border-radius: 3px;
+  background: #f7f9fb;
+  color: #a9b9c5;
+}
+.water-tags .water-status {
+  background: #fbf6eb;
+  color: #bda982;
+}
+.water-conditions {
+  display: none;
+  font-size: 10px;
+  line-height: 1.9;
+  color: #a3b4c1;
+  margin: 9px 0;
+}
+.water-offer.selected .water-conditions {
+  display: block;
+}
+.water-evidence {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  font-size: 8px;
+  color: #b4c2cb;
+  flex-wrap: wrap;
+}
+.water-offer.selected .water-evidence {
+  display: flex;
+}
+.water-feedback-counts {
+  display: none;
+  font-size: 8px;
+  color: #b2c1ca;
+  margin: 6px 0;
+}
+.water-offer.selected .water-feedback-counts {
+  display: block;
+}
+.water-offer-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f3f6;
+  flex-wrap: wrap;
+}
+.water-offer-actions button,
+.water-offer-actions a {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  font-size: 9px;
+  color: #8eacbe;
+  padding: 2px 0;
+}
+.water-no-link {
+  font-size: 8px;
+  color: #c0cbd2;
+  margin-left: auto;
+}
+.water-offer-actions a {
+  margin-left: auto;
+}
+.water-map-selected {
+  position: absolute;
+  right: 16px;
+  bottom: 66px;
+  width: 330px;
+  max-width: calc(100% - 32px);
+  max-height: calc(100% - 110px);
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #dae4ee;
+  box-shadow: 0 4px 20px #415a7614;
+  border-radius: 8px;
+  padding: 16px;
+  z-index: 8;
+}
+.water-map-selected > strong {
+  display: block;
+  padding-right: 22px;
+  font-size: 14px;
+  color: #58768b;
+}
+.water-map-selected p {
+  font-size: 11px;
+  line-height: 1.85;
+  color: #9db0bf;
+  margin: 9px 0;
+}
+.water-pin-price {
+  font-size: 24px;
+  color: #648ea4;
+  font-weight: 650;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+}
+.water-pin-price span {
+  font-size: 11px;
+  font-weight: 400;
+  color: #a4b6c4;
+  margin-left: auto;
+}
+.water-pin-close {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+}
+.water-pin-actions {
+  display: flex;
+  gap: 7px;
+}
+.water-pin-actions button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  padding: 7px 10px;
+  border-radius: 5px;
+  border: 1px solid #e1eaf0;
+  color: #839fb1;
+}
+.water-map-selected > a {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #7a9cb2;
+}
+.water-search-area {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 7;
+  white-space: nowrap;
+}
+.water-candidates {
+  padding: 12px 13px;
+  border-top: 1px solid #edf1f4;
+}
+.water-candidates summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: #8da2b3;
+  cursor: pointer;
+}
+.water-candidates summary > b {
+  font-size: 9px;
+  font-weight: 400;
+  margin-left: auto;
+}
+.water-candidates > p {
+  font-size: 9px;
+  line-height: 1.8;
+  color: #b0bfc9;
+  margin: 10px 0;
+}
+.water-candidates > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f4f7;
+}
+.water-candidates > div > span {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+.water-candidates strong {
+  font-size: 10px;
+  font-weight: 550;
+  color: #8ca2b4;
+}
+.water-candidates small {
+  font-size: 8px;
+  color: #b9c6ce;
+}
+.water-candidates button {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+  color: #8ba7b7;
+}
+.water-footer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 13px;
+  border-top: 1px solid #edf1f4;
+  color: #a1b2be;
+  font-size: 9px;
+  flex-shrink: 0;
+}
+.water-footer > a {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  margin-left: auto;
+  color: #b0bec8;
+  font-size: 9px;
+}
+.water-error {
+  padding: 10px 13px;
+  background: #fff9f2;
+  font-size: 10px;
+  color: #bda489;
+  line-height: 1.8;
+  flex-shrink: 0;
+}
+.water-error button {
+  font-size: 10px;
+  margin-left: 7px;
+  text-decoration: underline;
+}
+.water-empty {
+  padding: 22px 13px;
+  text-align: center;
+  color: #b1c1cc;
+  font-size: 11px;
+}
+.water-empty h2 {
+  font-size: 12px;
+  color: #94adbd;
+  font-weight: 550;
+}
+.water-empty p {
+  font-size: 10px;
+  line-height: 1.85;
+  color: #b3c1cb;
+}
+.water-empty .water-primary {
+  font-size: 10px;
+  margin-top: 8px;
+}
+.water-unlocated {
+  padding: 12px;
+  border: 1px solid #e6ebee;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+.water-unlocated h3 {
+  font-size: 11px;
+  color: #99adba;
+  font-weight: 550;
+  margin: 0;
+}
+.water-unlocated p {
+  font-size: 9px;
+  line-height: 1.8;
+  color: #b9c4cd;
+}
+.water-unlocated button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  padding: 6px 0;
+  color: #9cafbd;
+}
+.water-form-position {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+  color: #aaa2b4;
+  margin: -4px 0 16px;
+}
+.water-form-position button {
+  font-size: 10px;
+  padding: 6px 8px;
+  color: #819cae;
+  background: #eff5f7;
+  border-radius: 5px;
+}
+.water-manual-position {
+  font-size: 11px;
+  color: #9b8aa8;
+  margin-bottom: 18px;
+}
+.water-manual-position summary {
+  cursor: pointer;
+}
+.water-manual-position p {
+  font-size: 10px;
+  line-height: 1.8;
+}
+.water-manual-position .form-columns {
+  margin-top: 12px;
+}
+.water-history h3 {
+  font-size: 13px;
+  color: #947da5;
+  margin: 18px 0 10px;
+}
+.water-history > p {
+  font-size: 11px;
+  color: #afa1ba;
+  line-height: 1.8;
+}
+.water-history article {
+  padding: 12px;
+  border: 1px solid #eee7f2;
+  border-radius: 6px;
+  margin-bottom: 9px;
+  background: #fdfaff;
+}
+.water-history strong {
+  font-size: 11px;
+  font-weight: 550;
+  color: #967aa8;
+}
+.water-history article > span {
+  float: right;
+  font-size: 9px;
+  color: #c1afcd;
+}
+.water-history article > p {
+  font-size: 11px;
+  line-height: 1.8;
+  margin: 8px 0;
+  color: #ac96b9;
+}
+.water-history small {
+  font-size: 10px;
+  color: #bcacc8;
+}
+.water-mobile-toggle {
+  display: none;
+}
+@media (max-width: 799px) {
+  .header-actions {
+    gap: 8px;
+  }
+  .header-actions .water-nav {
+    padding: 7px;
+    font-size: 10px;
+  }
+  .header-actions .contribute span {
+    display: none;
+  }
+  .header-actions .contribute {
+    padding: 9px;
+  }
+  .water-header {
+    height: 52px;
+    padding: 0 12px;
+    gap: 9px;
+  }
+  .water-brand {
+    font-size: 16px;
+    gap: 7px;
+  }
+  .water-brand .brand-icon {
+    width: 26px;
+    height: 28px;
+    border-radius: 8px;
+  }
+  .water-header nav {
+    gap: 7px;
+  }
+  .water-header .water-back {
+    font-size: 0;
+    gap: 0;
+  }
+  .water-header .water-nav {
+    font-size: 10px;
+    padding: 6px;
+  }
+  .water-header .water-primary {
+    font-size: 10px;
+    padding: 8px 10px;
+  }
+  .water-sidebar {
+    left: 10px;
+    right: 10px;
+    width: auto;
+    top: auto;
+    bottom: 55px;
+    height: 61dvh;
+    max-height: calc(100% - 32px);
+    border-radius: 11px;
+  }
+  .water-sidebar:before {
+    content: "";
+    height: 3px;
+    width: 35px;
+    flex-shrink: 0;
+    border-radius: 3px;
+    background: #d8e2e9;
+    align-self: center;
+    margin: 8px 0 0;
+  }
+  .water-sidebar-closed {
+    display: none;
+  }
+  .water-location {
+    padding: 9px 12px 6px;
+  }
+  .water-location > button {
+    font-size: 9px;
+    padding: 4px 6px;
+  }
+  .water-toolbox {
+    padding: 5px 12px 8px;
+    gap: 7px;
+  }
+  .water-result-meta {
+    padding: 9px 12px 8px;
+    gap: 8px;
+  }
+  .water-result-meta > div:first-child {
+    font-size: 9px;
+  }
+  .water-result-meta > label {
+    font-size: 8px;
+  }
+  .water-offer {
+    padding: 11px;
+  }
+  .water-offer-actions {
+    gap: 8px;
+  }
+  .water-offer-actions button,
+  .water-offer-actions a {
+    min-height: 32px;
+    padding: 3px;
+  }
+  .water-map-wrap .map-controls {
+    right: 12px;
+    bottom: 80px;
+  }
+  .water-map-wrap .map-source {
+    right: 10px;
+    bottom: 12px;
+    font-size: 8px;
+  }
+  .water-map-wrap .map-legend {
+    right: 10px;
+    bottom: 32px;
+    font-size: 8px;
+  }
+  .water-map-caption {
+    right: 10px;
+    top: 10px;
+    max-width: 160px;
+    font-size: 8px;
+    padding: 5px 7px;
+  }
+  .water-map-selected {
+    right: 10px;
+    left: 10px;
+    width: auto;
+    bottom: 57px;
+    max-width: none;
+    max-height: 55dvh;
+    padding: 14px;
+  }
+  .water-mobile-toggle {
+    display: flex;
+    position: absolute;
+    bottom: 50px;
+    left: 10px;
+    z-index: 10;
+  }
+  .water-mobile-toggle button {
+    background: #fff;
+    border: 1px solid #dce5ec;
+    border-radius: 20px;
+    box-shadow: 0 3px 12px #384f6917;
+    color: #7b9bb0;
+    padding: 10px 16px;
+    font-size: 11px;
+  }
+  .water-sidebar:not(.water-sidebar-closed) ~ .water-mobile-toggle {
+    left: 50%;
+    translate: -50% 0;
+    bottom: 10px;
+  }
+  .water-pin-close {
+    right: 9px;
+    top: 9px;
+  }
+  .water-pin-actions button {
+    min-height: 36px;
+  }
+  .water-map-selected > a {
+    min-height: 34px;
+  }
+  .water-footer {
+    padding: 8px 12px;
+    font-size: 8px;
+  }
+  .water-footer > a {
+    font-size: 8px;
+  }
+}
+/* General map uses the same restrained map-first layout. */
+.app-shell .topbar {
+  height: 56px;
+  padding: 0 20px;
+}
+.app-shell .brand {
+  font-size: 19px;
+  gap: 9px;
+}
+.app-shell .brand-icon {
+  height: 31px;
+  width: 30px;
+  border-radius: 9px;
+}
+.app-shell .brand small {
+  display: none;
+}
+.app-shell .workspace {
+  position: relative;
+}
+.app-shell .sidebar {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  bottom: 14px;
+  width: 360px;
+  border: 1px solid #e1e6ec;
+  border-radius: 9px;
+  box-shadow: 0 4px 18px #3f526c14;
+  overflow: hidden;
+}
+.app-shell .map-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  background: #f4f5f6;
+}
+.app-shell .map-topbar {
+  position: absolute;
+  right: 15px;
+  top: 15px;
+  z-index: 7;
+  height: auto;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #e5e8ef;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.app-shell .map-topbar h2 {
+  font-size: 11px;
+  font-weight: 550;
+  margin: 0;
+  color: #8e9aaa;
+}
+.app-shell .map-eyebrow {
+  display: none;
+}
+.app-shell .map-filter-badge {
+  padding: 5px 7px;
+  font-size: 9px;
+  border: 0;
+}
+.app-shell .map-canvas {
+  height: 100%;
+  width: 100%;
+}
+.app-shell .search-area {
+  padding: 15px 15px 10px;
+}
+.app-shell .feed-tabs {
+  padding: 0 15px;
+  min-height: 42px;
+  gap: 18px;
+}
+.app-shell .category-grid {
+  padding: 12px 15px 11px;
+}
+.app-shell .filter-row {
+  padding: 0 15px 12px;
+}
+.app-shell .result-heading {
+  padding: 13px 16px 10px;
+}
+.app-shell .results {
+  padding: 0 12px 12px;
+}
+.app-shell .detail-card {
+  left: auto;
+  right: 75px;
+  bottom: 54px;
+  width: 330px;
+  max-height: calc(100% - 130px);
+}
+.compact-map-status {
+  position: absolute;
+  right: 15px;
+  top: 67px;
+  z-index: 7;
+  background: #fff;
+  border: 1px solid #e7eaf0;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  font-size: 9px;
+  color: #b2a07d;
+}
+.compact-map-status > button {
+  padding: 0;
+  font-size: 9px;
+  color: #8a79ad;
+}
+.app-shell .sidebar-footer {
+  padding: 8px 15px;
+  font-size: 8px;
+}
+.app-shell .store-card {
+  padding: 12px;
+}
+.app-shell .list-footnote {
+  font-size: 8px;
+  line-height: 1.8;
+}
+@media (max-width: 799px) {
+  .app-shell .topbar {
+    height: 52px;
+    padding: 0 13px;
+  }
+  .app-shell .brand {
+    font-size: 18px;
+  }
+  .app-shell .sidebar {
+    left: 10px;
+    right: 10px;
+    top: auto;
+    bottom: 54px;
+    height: 65dvh;
+    width: auto;
+    border-radius: 10px;
+  }
+  .app-shell .sidebar.mobile-hidden {
+    display: none;
+  }
+  .app-shell .map-panel {
+    display: flex;
+  }
+  .app-shell .map-topbar {
+    right: 10px;
+    top: 10px;
+    padding: 5px 8px;
+  }
+  .app-shell .map-topbar h2 {
+    font-size: 10px;
+  }
+  .compact-map-status {
+    top: 49px;
+    right: 10px;
+    padding: 5px 8px;
+    font-size: 8px;
+    gap: 7px;
+  }
+  .compact-map-status > button {
+    font-size: 8px;
+  }
+  .app-shell .search-area {
+    padding: 13px 13px 8px;
+  }
+  .app-shell .feed-tabs {
+    min-height: 39px;
+    padding: 0 15px;
+  }
+  .app-shell .category-grid {
+    padding: 10px 13px 9px;
+    gap: 6px;
+  }
+  .app-shell .category-grid button {
+    padding: 8px 7px;
+    font-size: 10px;
+  }
+  .app-shell .filter-row {
+    padding: 0 13px 10px;
+  }
+  .app-shell .result-heading {
+    padding: 11px 14px 8px;
+  }
+  .app-shell .results {
+    padding: 0 10px 10px;
+  }
+  .app-shell .mobile-toggle {
+    bottom: 12px;
+    padding: 10px 18px;
+  }
+  .app-shell .detail-card {
+    left: 10px;
+    right: 10px;
+    bottom: 56px;
+    width: auto;
+    max-height: 55dvh;
+  }
+  .app-shell .map-controls {
+    bottom: 83px;
+  }
+  .app-shell .sidebar-footer {
+    min-height: 30px;
+    font-size: 8px;
+  }
+  .app-shell .map-source {
+    bottom: 14px;
+    font-size: 8px;
+  }
+  .app-shell .map-legend {
+    bottom: 14px;
+    font-size: 7px;
+  }
+}
+
+.water-map-wrap .map-controls {
+  top: 76px;
+  bottom: auto;
+}
+.water-location strong {
+  font-size: 12px;
+}
+.water-store-name {
+  font-size: 13px;
+}
+.water-offer-top > div > span {
+  font-size: 9px;
+}
+.water-select {
+  font-size: 10px;
+}
+.water-select select {
+  font-size: 11px;
+}
+.water-conditions {
+  color: #8298a9;
+}
+.water-map-selected p {
+  color: #8195a7;
+}
+.water-map-selected {
+  right: 75px;
+}
+.water-pack-tabs button {
+  font-size: 10px;
+}
+@media (max-width: 799px) {
+  .water-map-wrap .map-controls {
+    top: 85px;
+    bottom: auto;
+  }
+  .water-map-selected {
+    right: 10px;
+  }
+  .app-shell .map-controls {
+    top: 90px;
+    bottom: auto;
+  }
+}

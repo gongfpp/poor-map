@@ -8,12 +8,12 @@ declare global {
   }
 }
 let sdkPromise: Promise<any> | null = null;
-function loadSdk(key: string) {
+function loadSdk(key: string, serviceHost?: string) {
   if (window.AMap) return Promise.resolve(window.AMap);
   if (!sdkPromise)
     sdkPromise = new Promise((resolve, reject) => {
       window._AMapSecurityConfig = {
-        serviceHost: `${location.origin}/_AMapService`,
+        serviceHost: serviceHost || `${location.origin}/_AMapService`,
       };
       const script = document.createElement("script");
       script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(key)}`;
@@ -52,6 +52,10 @@ type Props = {
   onMove: (center: [number, number]) => void;
   eventIds: Set<string>;
   canLocate?: boolean;
+  radiusMeters?: number;
+  waterMode?: boolean;
+  markerLabels?: Record<string, string>;
+  serviceHost?: string;
 };
 export default function MapView({
   stores,
@@ -65,6 +69,10 @@ export default function MapView({
   onMove,
   eventIds,
   canLocate = true,
+  radiusMeters = 3000,
+  waterMode = false,
+  markerLabels,
+  serviceHost,
 }: Props) {
   const host = useRef<HTMLDivElement>(null),
     map = useRef<any>(null),
@@ -85,7 +93,7 @@ export default function MapView({
     let cancelled = false;
     let readyTimer: ReturnType<typeof setTimeout> | undefined;
     setMapState("正在加载高德地图…");
-    loadSdk(jsKey)
+    loadSdk(jsKey, serviceHost)
       .then((AMap) => {
         if (cancelled) return;
         map.current = new AMap.Map(host.current, {
@@ -120,7 +128,7 @@ export default function MapView({
       map.current = null;
       setReady(false);
     };
-  }, [demo, mapReady, jsKey, retry]);
+  }, [demo, mapReady, jsKey, retry, serviceHost]);
   useEffect(() => {
     map.current?.setCenter(center);
     setZoom(1);
@@ -133,11 +141,21 @@ export default function MapView({
       button.className = `pin ${selected === s.id ? "selected" : ""} ${eventIds.has(s.id) ? "event-pin" : ""}`;
       button.style.setProperty(
         "--pin-color",
-        categories.find((c) => c.id === s.category)!.color,
+        waterMode
+          ? s.source === "community"
+            ? "#659ac4"
+            : "#c4a36f"
+          : categories.find((c) => c.id === s.category)!.color,
       );
-      button.textContent = eventIds.has(s.id)
-        ? "免"
-        : categories.find((c) => c.id === s.category)!.short;
+      button.textContent =
+        markerLabels?.[s.id] ||
+        (waterMode
+          ? s.source === "community"
+            ? "水"
+            : "店"
+          : eventIds.has(s.id)
+            ? "免"
+            : categories.find((c) => c.id === s.category)!.short);
       button.title = s.name;
       button.setAttribute("aria-label", `查看 ${s.name}`);
       button.onclick = () => callbacks.current.onSelect(s.id);
@@ -152,7 +170,7 @@ export default function MapView({
     return () => {
       if (map.current) map.current.remove(markers.current);
     };
-  }, [stores, selected, ready, eventIds]);
+  }, [stores, selected, ready, eventIds, waterMode, markerLabels]);
   function changeZoom(delta: number) {
     if (map.current) map.current.setZoom(map.current.getZoom() + delta);
     else setZoom((z) => Math.min(1.8, Math.max(0.65, z + delta * 0.2)));
@@ -167,123 +185,168 @@ export default function MapView({
       {(demo || !ready) && (
         <div className="schematic" aria-label="坐标示意图，非真实道路地图">
           <div className="map-drawing" style={{ transform: `scale(${zoom})` }}>
-            <svg
-              viewBox="0 0 1000 800"
-              preserveAspectRatio="xMidYMid slice"
-              aria-hidden="true"
-            >
-              <defs>
-                <pattern
-                  id="blocks"
-                  width="146"
-                  height="116"
-                  patternUnits="userSpaceOnUse"
-                  patternTransform="rotate(-13)"
-                >
-                  <rect width="146" height="116" fill="#eeede7" />
-                  <rect
-                    x="14"
-                    y="14"
-                    width="118"
-                    height="88"
-                    rx="7"
-                    fill="#e6e4dd"
-                  />
-                  <rect
-                    x="24"
-                    y="22"
-                    width="39"
-                    height="30"
-                    rx="3"
-                    fill="#dfdcd4"
-                  />
-                  <rect
-                    x="70"
-                    y="22"
-                    width="48"
-                    height="55"
-                    rx="3"
-                    fill="#dedbd4"
-                  />
-                  <path
-                    d="M0 0h146v116H0z"
-                    fill="none"
-                    stroke="#faf9f5"
-                    strokeWidth="12"
-                  />
-                </pattern>
-              </defs>
-              <rect width="1000" height="800" fill="url(#blocks)" />
-              <path
-                d="M830 -40C650 170 1050 255 735 455S810 682 600 860"
-                fill="none"
-                stroke="#bedbd8"
-                strokeWidth="90"
-              />
-              <path
-                d="M830 -40C650 170 1050 255 735 455S810 682 600 860"
-                fill="none"
-                stroke="#cce6e3"
-                strokeWidth="64"
-              />
-              <path
-                d="M-60 260L1090 540M340 -30L620 870M-60 655L1080 275"
-                stroke="#dcd8cd"
-                strokeWidth="32"
-                fill="none"
-              />
-              <path
-                d="M-60 260L1090 540M340 -30L620 870M-60 655L1080 275"
-                stroke="#fcfbf6"
-                strokeWidth="25"
-                fill="none"
-              />
-              <path
-                d="M140 100h145v93H140zM310 545l100-20 25 140-100 20zM833 614h150v114H833z"
-                fill="#c9d9b6"
-                stroke="#bcccaa"
-                strokeWidth="2"
-              />
-              <g fontSize="12" fill="#a6a398" fontFamily="sans-serif">
-                <text x="145" y="152">
-                  街区绿地
-                </text>
-                <text x="835" y="660">
-                  邻里公园
-                </text>
-                <text x="350" y="618">
-                  社区花园
-                </text>
-                <text x="100" y="346" transform="rotate(14 100 346)">
-                  生活路（示意）
-                </text>
-                <text x="350" y="190" transform="rotate(71 350 190)">
-                  邻里路（示意）
-                </text>
-                <text x="762" y="335" transform="rotate(-24 762 335)">
-                  河道示意
-                </text>
-                <text x="62" y="570" transform="rotate(-19 62 570)">
-                  街角路（示意）
-                </text>
-              </g>
-              <circle
-                cx="500"
-                cy="400"
-                r="210"
-                fill="#8863c9"
-                fillOpacity=".035"
-                stroke="#9371cb"
-                strokeDasharray="5 8"
-                strokeOpacity=".25"
-              />
-            </svg>
+            {demo ? (
+              <svg
+                viewBox="0 0 1000 800"
+                preserveAspectRatio="xMidYMid slice"
+                aria-hidden="true"
+              >
+                <defs>
+                  <pattern
+                    id="blocks"
+                    width="146"
+                    height="116"
+                    patternUnits="userSpaceOnUse"
+                    patternTransform="rotate(-13)"
+                  >
+                    <rect width="146" height="116" fill="#eeede7" />
+                    <rect
+                      x="14"
+                      y="14"
+                      width="118"
+                      height="88"
+                      rx="7"
+                      fill="#e6e4dd"
+                    />
+                    <rect
+                      x="24"
+                      y="22"
+                      width="39"
+                      height="30"
+                      rx="3"
+                      fill="#dfdcd4"
+                    />
+                    <rect
+                      x="70"
+                      y="22"
+                      width="48"
+                      height="55"
+                      rx="3"
+                      fill="#dedbd4"
+                    />
+                    <path
+                      d="M0 0h146v116H0z"
+                      fill="none"
+                      stroke="#faf9f5"
+                      strokeWidth="12"
+                    />
+                  </pattern>
+                </defs>
+                <rect width="1000" height="800" fill="url(#blocks)" />
+                <path
+                  d="M830 -40C650 170 1050 255 735 455S810 682 600 860"
+                  fill="none"
+                  stroke="#bedbd8"
+                  strokeWidth="90"
+                />
+                <path
+                  d="M830 -40C650 170 1050 255 735 455S810 682 600 860"
+                  fill="none"
+                  stroke="#cce6e3"
+                  strokeWidth="64"
+                />
+                <path
+                  d="M-60 260L1090 540M340 -30L620 870M-60 655L1080 275"
+                  stroke="#dcd8cd"
+                  strokeWidth="32"
+                  fill="none"
+                />
+                <path
+                  d="M-60 260L1090 540M340 -30L620 870M-60 655L1080 275"
+                  stroke="#fcfbf6"
+                  strokeWidth="25"
+                  fill="none"
+                />
+                <path
+                  d="M140 100h145v93H140zM310 545l100-20 25 140-100 20zM833 614h150v114H833z"
+                  fill="#c9d9b6"
+                  stroke="#bcccaa"
+                  strokeWidth="2"
+                />
+                <g fontSize="12" fill="#a6a398" fontFamily="sans-serif">
+                  <text x="145" y="152">
+                    街区绿地
+                  </text>
+                  <text x="835" y="660">
+                    邻里公园
+                  </text>
+                  <text x="350" y="618">
+                    社区花园
+                  </text>
+                  <text x="100" y="346" transform="rotate(14 100 346)">
+                    生活路（示意）
+                  </text>
+                  <text x="350" y="190" transform="rotate(71 350 190)">
+                    邻里路（示意）
+                  </text>
+                  <text x="762" y="335" transform="rotate(-24 762 335)">
+                    河道示意
+                  </text>
+                  <text x="62" y="570" transform="rotate(-19 62 570)">
+                    街角路（示意）
+                  </text>
+                </g>
+                <circle
+                  cx="500"
+                  cy="400"
+                  r="210"
+                  fill="#8863c9"
+                  fillOpacity=".035"
+                  stroke="#9371cb"
+                  strokeDasharray="5 8"
+                  strokeOpacity=".25"
+                />
+              </svg>
+            ) : (
+              <svg
+                viewBox="0 0 1000 800"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <defs>
+                  <pattern
+                    id="real-grid"
+                    width="50"
+                    height="50"
+                    patternUnits="userSpaceOnUse"
+                  >
+                    <path
+                      d="M50 0H0V50"
+                      stroke="#e8e6ee"
+                      strokeWidth="1"
+                      fill="none"
+                    />
+                  </pattern>
+                </defs>
+                <rect width="1000" height="800" fill="#f5f4f8" />
+                <rect width="1000" height="800" fill="url(#real-grid)" />
+                <ellipse
+                  cx="500"
+                  cy="400"
+                  rx="460"
+                  ry="360"
+                  fill="#7258cd"
+                  fillOpacity=".025"
+                  stroke="#bcaedf"
+                  strokeDasharray="6 7"
+                />
+              </svg>
+            )}
             <span className="center-dot" title="搜索中心">
               <i />
             </span>
             {stores.map((s) => {
-              const x = 50 + (s.location[0] - center[0]) * 1250,
-                y = 50 - (s.location[1] - center[1]) * 1550;
+              const x =
+                  50 +
+                  (s.location[0] - center[0]) *
+                    (demo
+                      ? 1250
+                      : (46 * 111320 * Math.cos((center[1] * Math.PI) / 180)) /
+                        radiusMeters),
+                y =
+                  50 -
+                  (s.location[1] - center[1]) *
+                    (demo ? 1550 : (46 * 111320) / radiusMeters);
               if (x < 1 || x > 99 || y < 2 || y > 98) return null;
               return (
                 <button
@@ -293,18 +356,25 @@ export default function MapView({
                     {
                       left: `${x}%`,
                       top: `${y}%`,
-                      "--pin-color": categories.find(
-                        (c) => c.id === s.category,
-                      )!.color,
+                      "--pin-color": waterMode
+                        ? s.source === "community"
+                          ? "#659ac4"
+                          : "#c4a36f"
+                        : categories.find((c) => c.id === s.category)!.color,
                     } as React.CSSProperties
                   }
                   title={s.name}
                   aria-label={`查看 ${s.name}`}
                   onClick={() => onSelect(s.id)}
                 >
-                  {eventIds.has(s.id)
-                    ? "免"
-                    : categories.find((c) => c.id === s.category)!.short}
+                  {markerLabels?.[s.id] ||
+                    (waterMode
+                      ? s.source === "community"
+                        ? "水"
+                        : "店"
+                      : eventIds.has(s.id)
+                        ? "免"
+                        : categories.find((c) => c.id === s.category)!.short)}
                 </button>
               );
             })}
@@ -357,16 +427,31 @@ export default function MapView({
         )}
       </div>
       <div className="map-legend">
-        {categories.map((c) => (
-          <span key={c.id}>
-            <i style={{ background: c.color }} />
-            {c.short}
+        {waterMode ? (
+          <>
+            <span>
+              <i style={{ background: "#659ac4" }} />
+              水价线索
+            </span>
+            <span>
+              <i style={{ background: "#c4a36f" }} />
+              候选超市
+            </span>
+          </>
+        ) : (
+          categories.map((c) => (
+            <span key={c.id}>
+              <i style={{ background: c.color }} />
+              {c.short}
+            </span>
+          ))
+        )}
+        {!waterMode && (
+          <span>
+            <i style={{ background: "#5d35c9" }} />
+            免费线索
           </span>
-        ))}
-        <span>
-          <i style={{ background: "#5d35c9" }} />
-          免费线索
-        </span>
+        )}
       </div>
     </div>
   );

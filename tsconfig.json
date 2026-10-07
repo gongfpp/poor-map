@@ -9,6 +9,7 @@
     "skipLibCheck": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
+    "allowJs": true,
     "types": ["node", "vite/client"]
   },
   "include": ["src", "tests/*.ts", "vite.config.ts", "playwright.config.ts"]

@@ -47,6 +47,8 @@ import {
 import { demoData } from "./data";
 import MapView from "./MapView";
 import { STATIC_DEMO } from "./config";
+import Modal from "./Modal";
+import { currentLocation } from "./location";
 const icons = {
   snack: Package,
   discount: ShoppingBag,
@@ -98,82 +100,6 @@ function readDeals(): Deal[] {
     return [];
   }
 }
-function Modal({
-  title,
-  children,
-  onClose,
-}: {
-  title: string;
-  children: ReactNode;
-  onClose: () => void;
-}) {
-  const box = useRef<HTMLDivElement>(null),
-    close = useRef(onClose);
-  close.current = onClose;
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement;
-    const old = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    box.current?.focus();
-    const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close.current();
-      if (e.key === "Tab") {
-        const els = box.current?.querySelectorAll<HTMLElement>(
-          "button,input,select,textarea,a[href]",
-        );
-        if (!els?.length) return;
-        const first = els[0],
-          last = els[els.length - 1];
-        if (
-          e.shiftKey &&
-          (document.activeElement === first ||
-            document.activeElement === box.current)
-        ) {
-          e.preventDefault();
-          last.focus();
-        } else if (
-          !e.shiftKey &&
-          (document.activeElement === last ||
-            document.activeElement === box.current)
-        ) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-    document.addEventListener("keydown", key);
-    return () => {
-      document.removeEventListener("keydown", key);
-      document.body.style.overflow = old;
-      previous?.focus();
-    };
-  }, []);
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        tabIndex={-1}
-        ref={box}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="modal-heading">
-          <h2>{title}</h2>
-          <button
-            className="icon-button"
-            aria-label="关闭弹窗"
-            onClick={onClose}
-          >
-            <X size={20} />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
 const money = (n: number) =>
   new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(n);
 export default function App() {
@@ -207,7 +133,29 @@ export default function App() {
     [placeQuery, setPlaceQuery] = useState(""),
     [placeBusy, setPlaceBusy] = useState(false),
     [locating, setLocating] = useState(false);
-  const sample = useMemo(() => demoData(center), [center]);
+  const centerChosen = useRef(false);
+  const sample = useMemo(
+    () =>
+      demoData(
+        center,
+        cities.find((c) => c.name === city)?.name || "current-area",
+      ),
+    [center, city],
+  );
+  useEffect(() => {
+    let active = true;
+    currentLocation()
+      .then((point) => {
+        if (active && !centerChosen.current) {
+          setCenter(point);
+          setCity("当前位置");
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
   const stores = demo ? sample.stores : liveStores;
   const deals = useMemo(
     () =>
@@ -347,6 +295,7 @@ export default function App() {
       toast("当前浏览器不支持定位，请搜索地址。");
       return;
     }
+    centerChosen.current = true;
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (p) => {
@@ -380,6 +329,7 @@ export default function App() {
         ),
         data = await r.json();
       if (!r.ok) throw new Error(data.error);
+      centerChosen.current = true;
       setCenter(data.center);
       setCity(data.label);
       setDraftCenter(null);
@@ -430,10 +380,10 @@ export default function App() {
             穷鬼地图<small>LESS MONEY, MORE LIFE</small>
           </span>
         </a>
-        <div className="topbar-center">
-          <span className="tiny-pill">省一点，开心多一点</span>
-        </div>
         <div className="header-actions">
+          <a className="water-nav" href="#/water">
+            便宜水
+          </a>
           <button className="header-link" onClick={() => setModal("insights")}>
             <BarChart3 size={18} />
             <span>附近分析</span>
@@ -445,7 +395,11 @@ export default function App() {
           >
             <CircleHelp size={19} />
           </button>
-          <button className="contribute" onClick={() => setModal("report")}>
+          <button
+            className="contribute"
+            aria-label="分享省钱线索"
+            onClick={() => setModal("report")}
+          >
             <Plus size={17} />
             <span>分享省钱线索</span>
           </button>
@@ -453,19 +407,7 @@ export default function App() {
       </header>
       <main className="workspace">
         <aside className={`sidebar ${mobileMap ? "mobile-hidden" : ""}`}>
-          <div className="sidebar-intro">
-            <div className="intro-eyebrow">
-              <span className="live-bubble" />
-              你的城市，藏着不少好价
-            </div>
-            <h1>
-              花小钱，
-              <br />
-              发现附近的<span>好生活。</span>
-              <Sparkles className="intro-star" size={30} />
-            </h1>
-            <p>从一袋零食，到今天的免费午餐。</p>
-          </div>
+          <h1 className="sr-only">穷鬼地图</h1>
           <div className="search-area">
             <button
               className="location-button"
@@ -805,8 +747,6 @@ export default function App() {
             )}
             {visible.length > 0 && (
               <p className="list-footnote">
-                便宜是线索，适合才是好价。
-                <br />
                 价格、库存与活动资格请以商家原始页面为准。
               </p>
             )}
@@ -830,9 +770,9 @@ export default function App() {
         >
           <div className="map-topbar">
             <div>
-              <span className="map-eyebrow">THE GOOD DEALS AROUND YOU</span>
+              <span className="map-eyebrow"></span>
               <h2>
-                附近值得逛的地方 <span>{visible.length}</span>
+                附近线索 <span>{visible.length}</span>
               </h2>
             </div>
             <button
@@ -859,33 +799,21 @@ export default function App() {
             eventIds={eventIds}
             canLocate={!STATIC_DEMO}
           />
-          <div className="mode-banner">
-            <span className="mode-banner-icon">
-              <Sparkles size={18} />
-            </span>
-            <div>
-              <strong>
-                {demo ? "先逛逛，这是一张演示地图" : "正在寻找真实门店"}
-              </strong>
-              <span>
-                {demo
-                  ? "展示筛选与活动玩法，所有地点和价格均为示例。"
-                  : "门店来自高德；优惠由本地线索提供，尚未接入平台。"}
-              </span>
-            </div>
+          <div className="compact-map-status">
+            <span>{demo ? "示例数据" : "高德门店"}</span>
             <button onClick={switchMode}>
               {STATIC_DEMO
                 ? "数据接入说明"
                 : demo
                   ? "切换真实数据"
                   : "返回演示"}
-              <ArrowRight size={14} />
             </button>
           </div>
           {draftCenter && (
             <button
               className="search-here primary-button"
               onClick={() => {
+                centerChosen.current = true;
                 setCenter(draftCenter);
                 setDraftCenter(null);
                 setCity("地图选点");
@@ -899,17 +827,6 @@ export default function App() {
             <div className="search-here">
               <LoaderCircle className="spin" size={16} />
               正在定位…
-            </div>
-          )}
-          {!current && (
-            <div className="map-tip">
-              <span className="tip-icon">
-                <Wallet size={20} />
-              </span>
-              <div>
-                <strong>少花一点，也可以过得很好。</strong>
-                <span>点一个地图标记，发现你的下一站。</span>
-              </div>
             </div>
           )}
           {current && (
@@ -1076,6 +993,7 @@ export default function App() {
                 className={city === c.name ? "active" : ""}
                 key={c.name}
                 onClick={() => {
+                  centerChosen.current = true;
                   setCity(c.name);
                   setCenter(c.center);
                   setDraftCenter(null);
