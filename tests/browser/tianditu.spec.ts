@@ -93,10 +93,20 @@ test("failed basemap cannot be advertised ready or accept a guessed store locati
   await page.goto("/");
   await expect(page.locator(".map-error")).toContainText("暂时无法加载");
   await expect(page.getByRole("button", { name: "标记门店" })).toBeDisabled();
+  for (let i = 0; i < 3; i++) {
+    await page.getByRole("button", { name: "放大地图", exact: true }).click();
+    await page.waitForTimeout(300);
+  }
+  await expect(
+    page.getByRole("button", { name: "放大地图", exact: true }),
+  ).toBeDisabled();
   await page.route("https://t*.tianditu.gov.cn/**", (r) =>
     r.fulfill({ contentType: "image/png", body: png }),
   );
   await page.getByRole("button", { name: "重新加载", exact: true }).click();
   await expect(page.getByRole("button", { name: "标记门店" })).toBeEnabled();
   await expect(page.locator(".map-error")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "放大地图", exact: true }),
+  ).toBeEnabled();
 });

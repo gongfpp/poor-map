@@ -48,6 +48,7 @@ export default function TiandituMapView({
   useEffect(() => {
     if (!host.current || !mapReady || !jsKey) return;
     setReady(false);
+    setCurrentZoom(15);
     callbacks.current.onReadyChange?.(false);
     setState("正在加载天地图…");
     const m = L.map(host.current, {
