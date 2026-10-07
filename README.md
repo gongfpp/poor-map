@@ -2,6 +2,10 @@
 
 把零食折扣、平价百货、日常吃饭和有条件说明的免费活动放在同一张地图上。第一版为手机优先的 Web 应用，使用 React + TypeScript + Vite，Node/Express 提供高德查询与密钥代理。
 
+[在线演示](https://gongfpp.github.io/poor-map/) · [GitHub 仓库](https://github.com/gongfpp/poor-map)
+
+GitHub Pages 版本为静态演示：支持分类、活动条件筛选、收藏、本地投稿和分析，不请求本地 API，也不提供真实高德门店查询。门店、价格、活动和道路均为示例。
+
 ![桌面演示](docs/preview-desktop.png)
 
 ## 运行
@@ -22,7 +26,22 @@ npm run build
 npm start
 ```
 
-此时打开 http://127.0.0.1:8787 。目前只绑定本机，没有部署到公网。
+此时打开 http://127.0.0.1:8787 。Node 服务默认只绑定本机；GitHub Pages 另行托管静态演示，不运行这个服务。
+
+## GitHub Pages 发布
+
+公开源码在 `main`，构建产物在 `gh-pages`，Pages 从 `gh-pages` 根目录发布。构建包含 `.nojekyll`、第三方许可证和 `deploy-meta.json`，后者记录对应源码 SHA。发布使用普通 push，不重写分支历史。
+
+```sh
+npm run build:pages
+npm run verify:pages
+# 在源文件已提交、origin 指向 gongfpp/poor-map 后发布
+npm run publish:pages
+# 等 Pages 部署完成后，验证实际线上页面与源码 SHA
+npm run verify:pages -- https://gongfpp.github.io/poor-map/
+```
+
+Pages 的资源和首页链接使用 `/poor-map/` 路径。公开演示不需要地图密钥，隐藏依赖后端的地址搜索与定位入口。真实地图仍通过本地完整服务接入，不能将安全密钥放到静态页面。
 
 ## 已实现的路径
 
@@ -69,6 +88,8 @@ npm run test:e2e
 
 浏览器测试使用已安装的 Chrome，包括桌面视口和 iPhone 13 尺寸的移动模拟。当前 18 项逻辑/接口测试、16 项浏览器场景通过；真实模式错误与恢复使用明确的测试返回数据。Chrome 手机模拟不能代替真实 iPhone/Safari 验收。
 
-本次未提供高德密钥，所以真实 SDK、真实 POI、实际位置与高德跳转未完成端到端验收。大陆网络可达性未在大陆网络现场测试。没有平台授权活动、账号系统、服务端投稿库、审核后台、实时库存或价格比对。当前版本适合体验交互并接入自己的高德密钥，不应当作已上线的实时优惠平台。
+本次未提供高德密钥，所以真实 SDK、真实 POI、实际位置与高德跳转未完成端到端验收。大陆网络可达性未在大陆网络现场测试。没有平台授权活动、账号系统、服务端投稿库、审核后台、实时库存或价格比对。当前公开页面用于体验交互，不应当作已上线的实时优惠平台。
 
 开发依赖有 `npm` 锁文件；`npm audit` 当前为 0 漏洞。公网部署前需要配置同源 HTTPS 服务、域名限制与服务端密钥环境，并按预期用户量确认地图授权和额度。
+
+公开范围、原创部分的权利声明和第三方许可证见 [PUBLIC_NOTICE.md](PUBLIC_NOTICE.md)。公开前审计记录见 [docs/PUBLIC_AUDIT.md](docs/PUBLIC_AUDIT.md)。

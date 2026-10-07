@@ -46,6 +46,7 @@ import {
 } from "./domain";
 import { demoData } from "./data";
 import MapView from "./MapView";
+import { STATIC_DEMO } from "./config";
 const icons = {
   snack: Package,
   discount: ShoppingBag,
@@ -248,6 +249,7 @@ export default function App() {
   };
   const toast = (text: string) => setNotice(text);
   useEffect(() => {
+    if (STATIC_DEMO) return;
     const controller = new AbortController();
     fetch("/api/config", { signal: controller.signal })
       .then((r) => {
@@ -416,7 +418,11 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <a className="brand" href="/" aria-label="穷鬼地图首页">
+        <a
+          className="brand"
+          href={import.meta.env.BASE_URL}
+          aria-label="穷鬼地图首页"
+        >
           <span className="brand-icon">
             <Wallet size={23} />
           </span>
@@ -851,6 +857,7 @@ export default function App() {
             onLocate={locate}
             onMove={setDraftCenter}
             eventIds={eventIds}
+            canLocate={!STATIC_DEMO}
           />
           <div className="mode-banner">
             <span className="mode-banner-icon">
@@ -867,7 +874,11 @@ export default function App() {
               </span>
             </div>
             <button onClick={switchMode}>
-              {demo ? "切换真实数据" : "返回演示"}
+              {STATIC_DEMO
+                ? "数据接入说明"
+                : demo
+                  ? "切换真实数据"
+                  : "返回演示"}
               <ArrowRight size={14} />
             </button>
           </div>
@@ -1055,7 +1066,9 @@ export default function App() {
       {modal === "city" && (
         <Modal title="从哪里开始逛？" onClose={() => setModal(null)}>
           <p className="modal-copy">
-            选择城市中心，或在真实数据模式下搜索附近的街道。
+            {STATIC_DEMO
+              ? "选择一个演示城市。当前公开页面使用示例地点，尚未接入真实位置服务。"
+              : "选择城市中心，或在真实数据模式下搜索附近的街道。"}
           </p>
           <div className="city-grid">
             {cities.map((c) => (
@@ -1075,34 +1088,38 @@ export default function App() {
               </button>
             ))}
           </div>
-          <form onSubmit={searchPlace} className="place-search">
-            <label htmlFor="place">自定义城市 / 街道 / 地址</label>
-            <div className="input-action">
-              <input
-                id="place"
-                value={placeQuery}
-                onChange={(e) => setPlaceQuery(e.target.value)}
-                placeholder="例如：宁波市鄞州区天童北路"
-                maxLength={80}
-              />
-              <button className="primary-button" disabled={placeBusy}>
-                {placeBusy ? "搜索中" : "搜索"}
+          {!STATIC_DEMO && (
+            <>
+              <form onSubmit={searchPlace} className="place-search">
+                <label htmlFor="place">自定义城市 / 街道 / 地址</label>
+                <div className="input-action">
+                  <input
+                    id="place"
+                    value={placeQuery}
+                    onChange={(e) => setPlaceQuery(e.target.value)}
+                    placeholder="例如：宁波市鄞州区天童北路"
+                    maxLength={80}
+                  />
+                  <button className="primary-button" disabled={placeBusy}>
+                    {placeBusy ? "搜索中" : "搜索"}
+                  </button>
+                </div>
+              </form>
+              <button
+                className="locate-modal"
+                onClick={() => {
+                  setModal(null);
+                  locate();
+                }}
+              >
+                <LocateFixed size={17} />
+                使用我的当前位置
               </button>
-            </div>
-          </form>
-          <button
-            className="locate-modal"
-            onClick={() => {
-              setModal(null);
-              locate();
-            }}
-          >
-            <LocateFixed size={17} />
-            使用我的当前位置
-          </button>
-          <p className="form-hint">
-            当前位置仅用于本次周边查询，不保存定位记录。
-          </p>
+              <p className="form-hint">
+                当前位置仅用于本次周边查询，不保存定位记录。
+              </p>
+            </>
+          )}
         </Modal>
       )}
       {modal === "config" && (
@@ -1111,12 +1128,16 @@ export default function App() {
             <Settings2 size={22} />
             <div>
               <strong>
-                {config.searchReady
-                  ? "高德门店查询已配置"
-                  : "当前可体验完整演示"}
+                {STATIC_DEMO
+                  ? "GitHub Pages · 公开演示版"
+                  : config.searchReady
+                    ? "高德门店查询已配置"
+                    : "当前可体验完整演示"}
               </strong>
               <p>
-                真实数据需要本地配置高德密钥。演示地址、单品价与活动均为虚构示例，不能作为出行依据。
+                {STATIC_DEMO
+                  ? "本站为静态演示，未部署地图查询服务。收藏与投稿只保存在你的浏览器中；演示门店、价格和活动不能作为出行依据。"
+                  : "真实数据需要本地配置高德密钥。演示地址、单品价与活动均为虚构示例，不能作为出行依据。"}
               </p>
             </div>
           </div>

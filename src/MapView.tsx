@@ -51,6 +51,7 @@ type Props = {
   onLocate: () => void;
   onMove: (center: [number, number]) => void;
   eventIds: Set<string>;
+  canLocate?: boolean;
 };
 export default function MapView({
   stores,
@@ -63,6 +64,7 @@ export default function MapView({
   onLocate,
   onMove,
   eventIds,
+  canLocate = true,
 }: Props) {
   const host = useRef<HTMLDivElement>(null),
     map = useRef<any>(null),
@@ -348,9 +350,11 @@ export default function MapView({
         >
           <Minus size={20} />
         </button>
-        <button title="定位到我" aria-label="定位到我" onClick={onLocate}>
-          <LocateFixed size={20} />
-        </button>
+        {canLocate && (
+          <button title="定位到我" aria-label="定位到我" onClick={onLocate}>
+            <LocateFixed size={20} />
+          </button>
+        )}
       </div>
       <div className="map-legend">
         {categories.map((c) => (
