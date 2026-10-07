@@ -41,3 +41,27 @@
   isolation: isolate;
   z-index: 0;
 }
+/* Keep failure recovery in the exposed map area, clear of the desktop sidebar. */
+.app-shell .td-canvas .map-error,
+.water-app .td-canvas .map-error {
+  left: auto;
+  right: 76px;
+  top: 112px;
+  bottom: auto;
+  max-width: calc(100% - 470px);
+}
+.app-shell .td-canvas .map-source {
+  left: 400px;
+}
+@media (max-width: 799px) {
+  .app-shell .td-canvas .map-error,
+  .water-app .td-canvas .map-error {
+    left: 12px;
+    right: 70px;
+    top: 105px;
+    max-width: none;
+  }
+  .app-shell .td-canvas .map-source {
+    left: 12px;
+  }
+}
