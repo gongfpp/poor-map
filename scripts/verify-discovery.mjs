@@ -60,7 +60,7 @@ try {
     }
   });
   await page.goto(url, { waitUntil: "domcontentloaded" });
-  await expect(page.locator(".discovery-note")).toContainText("已保存", {
+  await expect(page.locator(".discovery-note")).toContainText(/已保存 \d+ 家/, {
     timeout: 60000,
   });
   const sourceCards = page.locator(".store-card").filter({ hasText: label });
@@ -101,11 +101,13 @@ try {
   await page.screenshot({ path: "/tmp/poor-map-discovery-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload({ waitUntil: "domcontentloaded" });
-  await expect(page.locator(".discovery-note")).toContainText("已保存", {
+  await expect(page.locator(".discovery-note")).toContainText(/已保存 \d+ 家/, {
     timeout: 60000,
   });
   await page.getByRole("button", { name: "看列表", exact: true }).click();
-  assert.ok((await sourceCards.count()) > 0);
+  await expect
+    .poll(() => sourceCards.count(), { timeout: 15000 })
+    .toBeGreaterThan(0);
   assert.ok(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
