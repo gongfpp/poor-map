@@ -80,9 +80,12 @@ try {
         : q.keyword === "蜜雪冰城" && q.status === 200 && q.code === 1000,
     ),
   );
-  await expect(page.getByRole("button", { name: "标记门店" })).toBeEnabled({
-    timeout: 30000,
-  });
+  if (config.writeReady === false)
+    await expect(page.getByRole("button", { name: "标记门店" })).toBeDisabled();
+  else
+    await expect(page.getByRole("button", { name: "标记门店" })).toBeEnabled({
+      timeout: 30000,
+    });
   await expect
     .poll(() => tiles.some((t) => t.status === 200), { timeout: 15000 })
     .toBe(true);
