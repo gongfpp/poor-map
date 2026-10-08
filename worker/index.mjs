@@ -1,7 +1,22 @@
+import { writesPaused, quotaError, quotaMessage } from "./availability.mjs";
 import { communityRoute } from "./community.mjs";
 import { amapDiscovery } from "./discovery.mjs";
+import {
+  readPlaces,
+  savePlaces,
+  cacheSummary,
+  validateArea,
+  validPlaceFilters,
+} from "./place-cache.mjs";
+import {
+  backupDiscovery,
+  providerConfigured,
+  providerNames,
+} from "./providers.mjs";
+import { planNearest, NavigationError } from "./navigation.mjs";
 import { correctWaterPoint } from "./reference-migration.mjs";
 import { seedWater, validateWater } from "../src/water-domain.ts";
+import { distance } from "../src/domain.ts";
 const origins = new Set([
   "https://gongfpp.github.io",
   "http://127.0.0.1:5173",
@@ -38,8 +53,17 @@ const output = (data, status = 200) =>
     },
   });
 async function seed(env) {
+  const missing = [];
+  for (const o of seedWater)
+    if (
+      !(await env.DB.prepare("SELECT id FROM offers WHERE scope=? AND id=?")
+        .bind("public", o.id)
+        .first())
+    )
+      missing.push(o);
+  if (!missing.length || writesPaused(env)) return;
   await env.DB.batch(
-    seedWater.map((o) =>
+    missing.map((o) =>
       env.DB.prepare(
         "INSERT OR IGNORE INTO offers (scope,id,record,version,updated_at) VALUES (?,?,?,?,?)",
       ).bind("public", o.id, JSON.stringify(o), 1, o.updatedAt),
@@ -61,6 +85,7 @@ async function body(req) {
   if (text.length > 8192) throw new Error("内容过长。");
   return JSON.parse(text);
 }
+const readRateBuckets = new Map();
 async function rate(req, env, scope, maximum = 20, kind = "write") {
   if (scope.startsWith("qa")) return true;
   const bucket = Math.floor(Date.now() / 3600000),
@@ -73,6 +98,16 @@ async function rate(req, env, scope, maximum = 20, kind = "write") {
     hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", raw))]
       .map((n) => n.toString(16).padStart(2, "0"))
       .join("");
+  if (["sdk", "map", "geocode", "navigation"].includes(kind)) {
+    for (const [key, value] of readRateBuckets)
+      if (value.bucket !== bucket) readRateBuckets.delete(key);
+    if (readRateBuckets.size >= 2000 && !readRateBuckets.has(hash))
+      return false;
+    const entry = readRateBuckets.get(hash) || { bucket, count: 0 };
+    entry.count++;
+    readRateBuckets.set(hash, entry);
+    return entry.count <= maximum;
+  }
   const row = await env.DB.prepare(
     "INSERT INTO rate_limits(ip_hash,bucket,count) VALUES(?,?,1) ON CONFLICT(ip_hash,bucket) DO UPDATE SET count=count+1 RETURNING count",
   )
@@ -90,7 +125,9 @@ async function amap(env, path, params) {
   for (const [k, v] of Object.entries(params))
     url.searchParams.set(k, String(v));
   url.searchParams.set("key", env.AMAP_WEB_SERVICE_KEY);
-  const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  const r = await (env.UPSTREAM_FETCH || fetch)(url, {
+    signal: AbortSignal.timeout(10000),
+  });
   const d = await r.json();
   if (!r.ok || d.status !== "1")
     throw new Error(`高德查询失败（${d.infocode || r.status}），请稍后重试。`);
@@ -114,16 +151,29 @@ export async function route(req, env) {
   ) {
     if (req.method === "POST" && !isQA && !origins.has(origin))
       return output({ error: "请从穷鬼地图页面提交。" }, 403);
+    if (writesPaused(env) && ["POST", "PUT"].includes(req.method))
+      return path.startsWith("/api/analytics/")
+        ? output({ accepted: 0, paused: true }, 202)
+        : output({ error: quotaMessage }, 503);
     return communityRoute(req, env, scope, { isQA, rate, body, output });
   }
   if (path === "/api/water/config" && req.method === "GET") {
-    const td =
-      env.TIANDITU_WEB_KEY && url.searchParams.get("map") === "tianditu";
+    const td = url.searchParams.get("map") === "tianditu";
     return output({
       provider: td ? "tianditu" : "amap",
       jsKey: (td ? env.TIANDITU_WEB_KEY : env.AMAP_JS_KEY) || "",
-      mapReady: !!td || !!(env.AMAP_JS_KEY && env.AMAP_JS_SECURITY_CODE),
+      mapReady: td
+        ? !!env.TIANDITU_WEB_KEY
+        : !!(env.AMAP_JS_KEY && env.AMAP_JS_SECURITY_CODE),
       searchReady: !!env.AMAP_WEB_SERVICE_KEY,
+      cacheReady: true,
+      writeReady: !writesPaused(env),
+      writePausedUntil: writesPaused(env) ? env.WRITE_PAUSED_UNTIL : null,
+      providers: Object.keys(providerNames).map((id) => ({
+        id,
+        name: providerNames[id],
+        configured: providerConfigured(env, id),
+      })),
       shared: true,
     });
   }
@@ -171,17 +221,181 @@ export async function route(req, env) {
       },
     });
   }
-  if (path === "/api/water/candidates" && req.method === "GET") {
-    if (!env.AMAP_WEB_SERVICE_KEY)
-      return output({
-        stores: [],
-        configured: false,
-        note: "高德门店检索尚未开通；以下水价线索来自用户收录。",
+  if (path === "/api/water/candidates") {
+    if (req.method === "GET") {
+      const center = (url.searchParams.get("center") || "")
+          .split(",")
+          .map(Number),
+        radius = Number(url.searchParams.get("radius")),
+        mode = url.searchParams.get("mode") || "water";
+      const result = await readPlaces(env, scope, center, radius, mode, {
+        category: url.searchParams.get("category") || "all",
+        query: url.searchParams.get("query") || "",
       });
-    if (!(await rate(req, env, scope, 60, "search")))
-      return output({ error: "搜店请求较频繁，请稍后重试。" }, 429);
-    const result = await amapDiscovery(url, env, amap);
-    return output(result, result.status || 200);
+      return output(result, result.status || 200);
+    }
+    if (req.method === "POST") {
+      if (!isQA && !origins.has(origin))
+        return output({ error: "请从地图页面手动刷新。" }, 403);
+      if (writesPaused(env)) return output({ error: quotaMessage }, 503);
+      if (!(await rate(req, env, scope, 10, "refresh")))
+        return output({ error: "刷新较频繁，请稍后重试。" }, 429);
+      const p = await body(req),
+        center = p.center,
+        radius = p.radius,
+        mode = p.mode || "home";
+      if (
+        !validateArea(center, radius) ||
+        !["home", "water"].includes(mode) ||
+        !validPlaceFilters(p, mode)
+      )
+        return output({ error: "刷新区域无效。" }, 400);
+      const requested = p.provider || "auto",
+        attempts = [];
+      let result, provider;
+      if (requested !== "auto" && !providerNames[requested])
+        return output({ error: "未知门店来源。" }, 400);
+      const candidates =
+        requested === "auto" ? Object.keys(providerNames) : [requested];
+      for (const id of candidates) {
+        if (!providerConfigured(env, id)) continue;
+        try {
+          const u = new URL(url);
+          u.searchParams.set("center", center.join(","));
+          u.searchParams.set("radius", radius);
+          u.searchParams.set("mode", mode);
+          const d =
+            id === "amap"
+              ? await amapDiscovery(u, env, amap)
+              : await backupDiscovery(
+                  id,
+                  center,
+                  radius,
+                  mode,
+                  env,
+                  env.UPSTREAM_FETCH || fetch,
+                );
+          if (d.error) throw Error(d.error);
+          result = d;
+          provider = id;
+          break;
+        } catch {
+          attempts.push(providerNames[id] + "刷新未成功。");
+        }
+      }
+      if (!result)
+        return output(
+          {
+            error: attempts.join(" ") || "没有可用的门店来源。旧缓存仍可查看。",
+          },
+          503,
+        );
+      const storeIds = result.stores.map((s) => s.id).sort();
+      const hash = [
+        ...new Uint8Array(
+          await crypto.subtle.digest(
+            "SHA-256",
+            new TextEncoder().encode(storeIds.join(",")),
+          ),
+        ),
+      ]
+        .map((n) => n.toString(16).padStart(2, "0"))
+        .join("")
+        .slice(0, 32);
+      const key = ["nearby", provider, mode, hash].join(":");
+      await savePlaces(env, scope, result.stores, {
+        key,
+        provider,
+        storeIds,
+        mode,
+        warnings: [...attempts, ...result.warnings],
+        complete: !result.warnings.length,
+      });
+      const saved = await readPlaces(env, scope, center, radius, mode, p);
+      return output({
+        ...saved,
+        refreshed: true,
+        provider,
+        warnings: [...attempts, ...result.warnings],
+      });
+    }
+  }
+  if (path === "/api/discovery/summary" && req.method === "GET")
+    return output(await cacheSummary(env, scope));
+  if (path === "/api/discovery/import" && req.method === "POST") {
+    if (
+      !env.DATA_ADMIN_TOKEN ||
+      req.headers.get("authorization") !== `Bearer ${env.DATA_ADMIN_TOKEN}`
+    )
+      return output({ error: "未授权。" }, 403);
+    const text = await req.text();
+    if (text.length > 350000) return output({ error: "批次过大。" }, 413);
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return output({ error: "导入格式无效。" }, 400);
+    }
+    if (
+      !data ||
+      !Array.isArray(data.stores) ||
+      data.stores.length > 500 ||
+      !data.run ||
+      typeof data.run.key !== "string" ||
+      !providerNames[data.run.provider]
+    )
+      return output({ error: "导入格式无效。" }, 400);
+    const storage = {};
+    const count = await savePlaces(
+      env,
+      isQA ? scope : "public",
+      data.stores,
+      data.run,
+      storage,
+    );
+    return output({ ok: true, count, storage });
+  }
+  if (path === "/api/navigation/nearest" && req.method === "POST") {
+    if (!isQA && !origins.has(origin))
+      return output({ error: "请从地图页面规划路线。" }, 403);
+    if (!(await rate(req, env, scope, 30, "navigation")))
+      return output({ error: "导航请求较频繁。" }, 429);
+    const p = await body(req);
+    if (!validateArea(p.origin, p.radius))
+      return output({ error: "请选择有效出发点与范围。" }, 400);
+    const cached = await readPlaces(env, scope, p.origin, p.radius, "home", {
+      category: "discount",
+    });
+    const own = await env.DB.prepare("SELECT record FROM stores WHERE scope=?")
+      .bind(scope)
+      .all();
+    const known = new Set();
+    const unique = [];
+    for (const s of [
+      ...own.results.map((r) => JSON.parse(r.record)),
+      ...cached.stores,
+    ]) {
+      if (known.has(s.id)) continue;
+      known.add(s.id);
+      if (s.amapId) known.add(s.amapId);
+      unique.push(s);
+    }
+    const near = unique.filter(
+      (s) =>
+        s.category === "discount" &&
+        s.location &&
+        distance(p.origin, s.location) <= p.radius,
+    );
+    try {
+      return output(
+        await planNearest(p.origin, near, env, env.UPSTREAM_FETCH || fetch),
+      );
+    } catch (e) {
+      return output(
+        { error: e.message },
+        e instanceof NavigationError ? e.status : 503,
+      );
+    }
   }
 
   if (path === "/api/water/geocode" && req.method === "GET") {
@@ -204,7 +418,7 @@ export async function route(req, env) {
   }
   if (path === "/api/water" && req.method === "GET") {
     if (scope === "public") await seed(env);
-    if (scope === "public") await correctWaterPoint(env);
+    if (scope === "public" && !writesPaused(env)) await correctWaterPoint(env);
     const rows = await env.DB.prepare(
       "SELECT record FROM offers WHERE scope=? ORDER BY updated_at DESC LIMIT 1000",
     )
@@ -261,6 +475,7 @@ export async function route(req, env) {
     return output({ error: "接口不存在。" }, 404);
   if (!isQA && !origins.has(origin))
     return output({ error: "请从穷鬼地图页面提交。" }, 403);
+  if (writesPaused(env)) return output({ error: quotaMessage }, 503);
   if (!(await rate(req, env, scope)))
     return output({ error: "本小时提交较多，请稍后再试。" }, 429);
   const value = await body(req);
@@ -360,10 +575,31 @@ export default {
     try {
       response = await route(req, env);
     } catch (e) {
+      if (
+        env.DATA_ADMIN_TOKEN &&
+        req.headers.get("authorization") === `Bearer ${env.DATA_ADMIN_TOKEN}`
+      ) {
+        let detail = String(e.message || "request failed").replace(
+          /https?:\/\/\S+/g,
+          "[URL]",
+        );
+        for (const [name, value] of Object.entries(env))
+          if (
+            /KEY|TOKEN|CODE/.test(name) &&
+            typeof value === "string" &&
+            value.length >= 8
+          )
+            detail = detail.replaceAll(value, "[redacted]");
+        return output(
+          { error: "服务诊断失败", detail: detail.slice(0, 250) },
+          503,
+        );
+      }
       response = output(
         {
-          error:
-            e instanceof SyntaxError
+          error: quotaError(e)
+            ? quotaMessage
+            : e instanceof SyntaxError
               ? "提交的 JSON 无效。"
               : e.message?.includes("高德")
                 ? e.message

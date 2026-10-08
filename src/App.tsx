@@ -1,9 +1,7 @@
-import {
-  discoverStores,
-  mergeStores,
-  clearDiscoveryCache,
-  discoverAmap,
-} from "./discovery";
+import { preferredMap, rememberMap } from "./map-preference";
+import { NavigationPanel } from "./NavigationPanel";
+import type { NavigationResult } from "./navigation-domain";
+import { mergeStores, discoverAmap, cacheDescription } from "./discovery";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bookmark,
@@ -26,13 +24,14 @@ import {
 } from "lucide-react";
 import {
   activeCategories,
+  storeSourceName,
   cities,
   distance,
   distanceText,
   type Store,
 } from "./domain";
 import MapView from "./MapView";
-import { STATIC_DEMO, WATER_API } from "./config";
+import { WATER_API } from "./config";
 import Modal from "./Modal";
 import { currentLocation } from "./location";
 import Comments from "./Comments";
@@ -52,6 +51,8 @@ export default function App() {
       jsKey: "",
       mapReady: false,
       searchReady: false,
+      writeReady: true,
+      providers: [] as { id: string; name: string; configured: boolean }[],
     }),
     [tileReady, setTileReady] = useState(false),
     [demo] = useState(false),
@@ -65,8 +66,12 @@ export default function App() {
     [saved, setSaved] = useState(readSaved),
     [live, setLive] = useState<Store[]>([]),
     [nearby, setNearby] = useState<Store[]>([]),
-    [discoveryNote, setDiscoveryNote] = useState("正在检查附近门店检索…"),
+    [discoveryNote, setDiscoveryNote] = useState("正在读取保存的门店…"),
     [discovering, setDiscovering] = useState(false),
+    [gpsOrigin, setGpsOrigin] = useState<[number, number] | null>(null),
+    [navOrigin, setNavOrigin] = useState<[number, number] | null>(null),
+    [navPicking, setNavPicking] = useState(false),
+    [navRoute, setNavRoute] = useState<NavigationResult | null>(null),
     [selected, setSelected] = useState<string | null>(null),
     [modal, setModal] = useState<"city" | "config" | "report" | "store" | null>(
       null,
@@ -83,12 +88,40 @@ export default function App() {
     [placeBusy, setPlaceBusy] = useState(false),
     [sharingStore, setSharingStore] = useState(""),
     [analytics, setAnalytics] = useState(analyticsEnabled);
+  const [mapChoice, setMapChoice] = useState(preferredMap);
+  const [citySearch, setCitySearch] = useState("");
+  const [cityCounts, setCityCounts] = useState<Record<string, number>>({});
+  const [cityStatsStatus, setCityStatsStatus] = useState("loading");
+  useEffect(() => {
+    if (modal !== "city") return;
+    const c = new AbortController();
+    setCityStatsStatus("loading");
+    fetch(`${WATER_API}/api/discovery/summary`, { signal: c.signal })
+      .then((r) => {
+        if (!r.ok) throw Error();
+        return r.json();
+      })
+      .then((d) => {
+        const counts: Record<string, number> = {};
+        for (const city of d.cities || [])
+          counts[city.cityName] = (d.groups || [])
+            .filter((g: any) => g.city === city.city)
+            .reduce((n: number, g: any) => n + g.count, 0);
+        setCityCounts(counts);
+        setCityStatsStatus("ready");
+      })
+      .catch(() => {
+        if (!c.signal.aborted) setCityStatsStatus("unavailable");
+      });
+    return () => c.abort();
+  }, [modal]);
   const chosen = useRef(false);
   useEffect(() => {
     let active = true;
     track("location_request");
     currentLocation()
       .then((p) => {
+        setGpsOrigin(p);
         track("location_success");
         if (active && !chosen.current) {
           setCenter(p);
@@ -102,7 +135,9 @@ export default function App() {
   }, []);
   useEffect(() => {
     const c = new AbortController();
-    fetch(`${WATER_API}/api/water/config`, { signal: c.signal })
+    fetch(`${WATER_API}/api/water/config?map=${mapChoice}`, {
+      signal: c.signal,
+    })
       .then((r) => {
         if (!r.ok) throw new Error();
         return r.json();
@@ -113,65 +148,44 @@ export default function App() {
           setNotice("底图配置暂时无法连接，稍后刷新重试。");
       });
     return () => c.abort();
-  }, [refresh]);
+  }, [refresh, mapChoice]);
   const stores = useMemo(() => mergeStores(live, nearby), [live, nearby]);
-  useEffect(() => {
-    if (
-      !config.searchReady &&
-      !(config.provider === "tianditu" && config.jsKey)
-    ) {
-      setNearby([]);
-      setDiscovering(false);
-      setDiscoveryNote("自动检索暂不可用，仍可查看共享门店。");
-      return;
-    }
+  const discoveryRequest = useRef<AbortController | null>(null);
+  async function loadSavedPlaces(manual = false) {
+    discoveryRequest.current?.abort();
     const c = new AbortController();
-    setNearby([]);
+    discoveryRequest.current = c;
     setDiscovering(true);
-    setDiscoveryNote("正在查找附近品牌门店…");
-    track("query_start", { radius });
-    (config.provider === "amap"
-      ? discoverAmap(center, radius, false, c.signal)
-      : discoverStores(
-          config.jsKey,
-          center,
-          radius,
-          false,
-          c.signal,
-          fetch,
-          setNearby,
-        )
-    )
-      .then((d) => {
-        setNearby(d.stores);
-        track("query_success", {
-          source: config.provider,
-          count: d.stores.length,
-        });
-        setDiscoveryNote(
-          d.warnings.length
-            ? `自动检索到 ${d.stores.length} 家候选。${d.warnings.join(" ")}`
-            : `自动检索到 ${d.stores.length} 家候选。地图收录可能不全，营业及优惠由用户补充。`,
-        );
-      })
-      .catch((e) => {
-        if (e.name !== "AbortError") {
-          setDiscoveryNote(e.message);
-          track("query_error", { source: config.provider });
-        }
-      })
-      .finally(() => {
-        if (!c.signal.aborted) setDiscovering(false);
-      });
-    return () => c.abort();
-  }, [
-    config.provider,
-    config.jsKey,
-    config.searchReady,
-    center,
-    radius,
-    refresh,
-  ]);
+    setDiscoveryNote(manual ? "正在手动更新附近门店…" : "正在读取已保存门店…");
+    try {
+      const data = await discoverAmap(
+        center,
+        radius,
+        false,
+        c.signal,
+        manual,
+        "auto",
+        { category, query },
+      );
+      if (c.signal.aborted) return;
+      setNearby(data.stores);
+      setDiscoveryNote(cacheDescription(data));
+      track("query_success", { count: data.stores.length });
+    } catch (e) {
+      if (!c.signal.aborted)
+        setDiscoveryNote((e as Error).message + " 已保存数据不会被清空。");
+    } finally {
+      if (!c.signal.aborted) setDiscovering(false);
+    }
+  }
+  useEffect(() => {
+    const timer = setTimeout(() => void loadSavedPlaces(), query ? 350 : 0);
+    return () => {
+      clearTimeout(timer);
+      discoveryRequest.current?.abort();
+    };
+  }, [center, radius, refresh, category, query]);
+
   const visible = useMemo(
     () =>
       stores
@@ -272,7 +286,9 @@ export default function App() {
     setLocating(true);
     track("location_request");
     try {
-      pick(await currentLocation(true), "当前位置");
+      const p = await currentLocation(true);
+      setGpsOrigin(p);
+      pick(p, "当前位置");
       track("location_success");
     } catch (e) {
       setNotice((e as Error).message);
@@ -322,11 +338,11 @@ export default function App() {
     setPlaceBusy(true);
     try {
       const r = await fetch(
-          `/api/center?query=${encodeURIComponent(place.trim())}`,
+          `${WATER_API}/api/water/geocode?query=${encodeURIComponent(place.trim())}`,
         ),
         d = await r.json();
       if (!r.ok) throw new Error(d.error);
-      pick(d.center, d.label);
+      pick(d.location, place.trim());
       open(null);
     } catch (e) {
       setNotice((e as Error).message);
@@ -351,7 +367,7 @@ export default function App() {
           <button
             className="header-link"
             aria-label="标记门店"
-            disabled={!tileReady}
+            disabled={!tileReady || config.writeReady === false}
             onClick={() => {
               track("store_create_start");
               setPicking(true);
@@ -376,7 +392,7 @@ export default function App() {
           <button
             className="contribute"
             aria-label="分享省钱线索"
-            disabled={!stores.length}
+            disabled={!stores.length || config.writeReady === false}
             onClick={share}
           >
             <Plus size={17} />
@@ -397,6 +413,7 @@ export default function App() {
               <Search size={18} />
               <input
                 aria-label="搜索门店"
+                maxLength={80}
                 placeholder="搜门店或品牌"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -486,15 +503,33 @@ export default function App() {
           <p className="discovery-note" role="status">
             {discoveryNote}
             <button
-              disabled={discovering}
+              disabled={discovering || config.writeReady === false}
               onClick={() => {
-                clearDiscoveryCache();
-                setRefresh((n) => n + 1);
+                void loadSavedPlaces(true);
               }}
             >
-              重查
+              刷新门店
             </button>
           </p>
+          <NavigationPanel
+            gpsOrigin={gpsOrigin}
+            pickedOrigin={navOrigin}
+            mapCenter={center}
+            radius={radius}
+            onLocate={async () => {
+              const p = await currentLocation(true);
+              setGpsOrigin(p);
+              pick(p, "当前位置");
+              return p;
+            }}
+            onPickOrigin={() => {
+              setNavPicking(true);
+              setPicking(false);
+              setMobileMap(true);
+            }}
+            onRoute={setNavRoute}
+            onShowRoute={() => setMobileMap(true)}
+          />
           <div className="result-heading">
             <span>
               {(loading || discovering) && !visible.length ? (
@@ -587,13 +622,11 @@ export default function App() {
                           {cat.label} ·{" "}
                           {s.locationPrecision === "area" ? "约 " : ""}
                           {distanceText(distance(center, s.location))} · 直线
-                          {s.source === "tianditu"
-                            ? " · 天地图"
-                            : s.source === "amap"
-                              ? " · 高德"
-                              : s.source === "demo"
-                                ? " · 演示"
-                                : ""}
+                          {storeSourceName(s.source)
+                            ? " · " + storeSourceName(s.source)
+                            : s.source === "demo"
+                              ? " · 演示"
+                              : ""}
                         </span>
                       </span>
                     </button>
@@ -615,7 +648,11 @@ export default function App() {
           </div>
           <div className="sidebar-footer">
             <span className={`status-dot ${demo ? "" : "live"}`} />
-            {demo ? "演示门店 · 不能用于出行" : "地图检索 + 社区线索"}
+            {config.writeReady === false
+              ? "共享提交暂限额 · 北京时间08:00恢复"
+              : demo
+                ? "演示门店 · 不能用于出行"
+                : "地图缓存 + 社区线索"}
             <button onClick={() => open("config")}>
               数据说明
               <ExternalLink size={11} />
@@ -636,6 +673,7 @@ export default function App() {
           </div>
           <MapView
             stores={visible}
+            navigationRoute={navRoute}
             center={center}
             selected={selected}
             onSelect={select}
@@ -646,8 +684,13 @@ export default function App() {
             mapReady={config.mapReady}
             onReadyChange={setTileReady}
             onPickLocation={
-              picking
+              picking || navPicking
                 ? (point) => {
+                    if (navPicking) {
+                      setNavOrigin(point);
+                      setNavPicking(false);
+                      return;
+                    }
                     track("map_pick");
                     setStorePoint(point);
                     setPicking(false);
@@ -665,11 +708,23 @@ export default function App() {
             canLocate={true}
           />
           <div className="compact-map-status">
-            <span>{picking ? "点地图标记门店" : "附近门店 · 参考位置"}</span>
+            <span>
+              {navPicking
+                ? "点地图选择出发点"
+                : picking
+                  ? "点地图标记门店"
+                  : "附近门店 · 参考位置"}
+            </span>
             <button
-              onClick={() => (picking ? setPicking(false) : open("config"))}
+              onClick={() =>
+                navPicking
+                  ? setNavPicking(false)
+                  : picking
+                    ? setPicking(false)
+                    : open("config")
+              }
             >
-              {picking ? "取消" : "数据说明"}
+              {picking || navPicking ? "取消" : "数据说明"}
             </button>
           </div>
           {draftCenter && (
@@ -691,13 +746,11 @@ export default function App() {
                       ?.label
                   }{" "}
                   ·{" "}
-                  {current.source === "tianditu"
-                    ? "天地图候选 · 营业状态待确认"
-                    : current.source === "amap"
-                      ? "高德候选 · 营业状态待确认"
-                      : current.source === "demo"
-                        ? "演示门店"
-                        : "用户标记 · 未核验"}
+                  {storeSourceName(current.source)
+                    ? storeSourceName(current.source) + "候选 · 营业状态待确认"
+                    : current.source === "demo"
+                      ? "演示门店"
+                      : "用户标记 · 未核验"}
                 </span>
                 <button
                   className="icon-button"
@@ -743,6 +796,7 @@ export default function App() {
                 </button>
               </div>
               <Comments
+                writable={config.writeReady !== false}
                 key={current.id}
                 storeId={current.id}
                 storeName={current.name}
@@ -781,24 +835,42 @@ export default function App() {
       {modal === "city" && (
         <Modal title="从哪里开始逛？" onClose={() => open(null)}>
           <p className="modal-copy">
-            当前位置仅用于本次筛选；示例门店不能作为出行依据。
+            选择城市参考中心，或使用设备位置。覆盖范围为56个城市；已保存数量以实际收集结果为准。
           </p>
+          <input
+            className="city-search"
+            aria-label="筛选城市"
+            placeholder="搜城市"
+            value={citySearch}
+            onChange={(e) => setCitySearch(e.target.value)}
+          />
           <div className="city-grid">
-            {cities.map((c) => (
-              <button
-                className={city === c.name ? "active" : ""}
-                key={c.name}
-                onClick={() => {
-                  pick(c.center, c.name);
-                  open(null);
-                }}
-              >
-                {c.name}
-                {city === c.name && <Check size={14} />}
-              </button>
-            ))}
+            {cities
+              .filter((c) => c.name.includes(citySearch.trim()))
+              .map((c) => (
+                <button
+                  className={city === c.name ? "active" : ""}
+                  key={c.name}
+                  onClick={() => {
+                    pick(c.center, c.name);
+                    open(null);
+                  }}
+                >
+                  <span>{c.name}</span>
+                  <small>
+                    {cityCounts[c.name] != null
+                      ? `已保存 ${cityCounts[c.name]} 家`
+                      : cityStatsStatus === "loading"
+                        ? "读取中…"
+                        : cityStatsStatus === "unavailable"
+                          ? "数量暂不可读"
+                          : "尚无收集记录"}
+                  </small>
+                  {city === c.name && <Check size={14} />}
+                </button>
+              ))}
           </div>
-          {!STATIC_DEMO && config.searchReady && (
+          {config.searchReady && (
             <form onSubmit={searchPlace} className="place-search">
               <label htmlFor="place">自定义城市 / 街道 / 地址</label>
               <div className="input-action">
@@ -846,6 +918,7 @@ export default function App() {
           </label>
           {sharingStore && (
             <Comments
+              writable={config.writeReady !== false}
               key={sharingStore}
               storeId={sharingStore}
               storeName={
@@ -882,14 +955,25 @@ export default function App() {
       {modal === "config" && (
         <Modal title="数据从哪里来？" onClose={() => open(null)}>
           <p className="modal-copy">
-            底图和候选门店来自当前地图服务，社区补充门店、评论和水价。高德每分类首批25家，天地图每品牌首批20家，地图收录可能不全，不能证明营业状态、商品价格或库存。
+            门店参考点来自已保存的地图查询结果，只有点击“刷新门店”才查询供应商并补充缓存。缓存不自动过期，旧点位仍需到店核对。底图瓦片与步行算路会联网；地图收录不能证明营业状态、价格或库存。
             收藏保存在当前浏览器；评论公开保存并允许回复纠错，均为未核验线索。
           </p>
           <div className="provider-row">
             <span>
               {config.provider === "amap" ? "高德道路底图" : "天地图道路底图"}
             </span>
-            <b>{config.mapReady ? "已配置" : "暂不可用"}</b>
+            <select
+              aria-label="底图来源"
+              value={mapChoice}
+              onChange={(e) => {
+                setMapChoice(e.target.value as "amap" | "tianditu");
+                rememberMap(e.target.value);
+                track("map_provider_change", { source: e.target.value });
+              }}
+            >
+              <option value="amap">高德</option>
+              <option value="tianditu">天地图（备用）</option>
+            </select>
           </div>
           {!config.mapReady && (
             <button
@@ -900,7 +984,7 @@ export default function App() {
             </button>
           )}
           <div className="provider-row">
-            <span>附近品牌门店检索</span>
+            <span>手动刷新门店来源</span>
             <b>
               {config.searchReady
                 ? "高德 · 个人研究学习"
@@ -909,6 +993,14 @@ export default function App() {
                   : "暂不可用"}
             </b>
           </div>
+          {config.providers
+            ?.filter((p) => p.id !== "amap")
+            .map((p) => (
+              <div className="provider-row" key={p.id}>
+                <span>{p.name}门店备用接口</span>
+                <b>{p.configured ? "服务Key已配置" : "服务Key待配置"}</b>
+              </div>
+            ))}
           <div className="provider-row">
             <span>美团 / 大众点评 / 抖音</span>
             <b>未接入</b>

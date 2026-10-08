@@ -1,3 +1,4 @@
+import { clusterStores } from "./map-clusters";
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -29,6 +30,7 @@ export default function TiandituMapView({
   waterMode = false,
   markerLabels,
   radiusMeters = 3000,
+  navigationRoute,
 }: MapProps) {
   const host = useRef<HTMLDivElement>(null),
     map = useRef<L.Map | null>(null),
@@ -161,12 +163,19 @@ export default function TiandituMapView({
     const group = pins.current;
     if (!group) return;
     group.clearLayers();
-    stores.forEach((s) => {
+    const groups = waterMode
+      ? stores.map((s) => ({ stores: [s], location: s.location }))
+      : clusterStores(stores, currentZoom, selected);
+    groups.forEach((entry) => {
+      const s = entry.stores[0],
+        clustered = entry.stores.length > 1;
       const button = document.createElement("button"),
         cat =
           activeCategories.find((c) => c.id === s.category) ||
           activeCategories[0];
       button.className = `pin ${s.id === selected ? "selected" : ""} ${eventIds.has(s.id) ? "event-pin" : ""}`;
+      if (clustered) button.classList.add("cluster-pin");
+      button.dataset.storeCount = String(entry.stores.length);
       button.style.setProperty(
         "--pin-color",
         waterMode
@@ -175,13 +184,26 @@ export default function TiandituMapView({
             : "#c4a36f"
           : cat.color,
       );
-      button.textContent =
-        markerLabels?.[s.id] ||
-        (waterMode ? (s.source === "community" ? "水" : "店") : cat.short);
-      button.title = s.name;
-      button.setAttribute("aria-label", `查看 ${s.name}`);
-      button.onclick = () => callbacks.current.onSelect(s.id);
-      L.marker(latLng(s.location), {
+      button.textContent = clustered
+        ? String(entry.stores.length)
+        : markerLabels?.[s.id] ||
+          (waterMode ? (s.source === "community" ? "水" : "店") : cat.short);
+      button.title = clustered
+        ? `${entry.stores.length}家参考门店，点击展开`
+        : s.name;
+      button.setAttribute(
+        "aria-label",
+        clustered ? `展开附近${entry.stores.length}家门店` : `查看 ${s.name}`,
+      );
+      button.onclick = () => {
+        if (clustered)
+          map.current?.setView(
+            latLng(entry.location),
+            Math.min(19, currentZoom + 2),
+          );
+        else callbacks.current.onSelect(s.id);
+      };
+      L.marker(latLng(entry.location), {
         icon: L.divIcon({
           html: button,
           className: "td-marker",
@@ -192,7 +214,18 @@ export default function TiandituMapView({
         keyboard: false,
       }).addTo(group);
     });
-  }, [stores, selected, ready, eventIds, waterMode, markerLabels]);
+  }, [stores, selected, ready, eventIds, waterMode, markerLabels, currentZoom]);
+  useEffect(() => {
+    if (!ready || !map.current || !navigationRoute) return;
+    const line = L.polyline(
+      navigationRoute.polyline.map((p) => latLng(p)),
+      { color: "#7353bf", weight: 6 },
+    ).addTo(map.current);
+    map.current.fitBounds(line.getBounds(), { padding: [80, 80] });
+    return () => {
+      line.remove();
+    };
+  }, [navigationRoute, ready]);
   function zoom(delta: number) {
     track("map_zoom", { action: delta > 0 ? "zoom_in" : "zoom_out" });
     map.current?.setZoom(map.current.getZoom() + delta);

@@ -18,6 +18,11 @@ const fixtures = [
 ];
 let comments: any[] = [];
 test.beforeEach(async ({ page }) => {
+  await page.route("**/api/water/candidates**", (r) =>
+    r.fulfill({
+      json: { stores: [], configured: true, cacheOnly: true, warnings: [] },
+    }),
+  );
   comments = [];
   await page.route("**/api/water/config*", (r) =>
     r.fulfill({

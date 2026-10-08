@@ -10,3 +10,7 @@ CREATE TABLE IF NOT EXISTS analytics_events (scope TEXT NOT NULL, id TEXT NOT NU
 CREATE INDEX IF NOT EXISTS analytics_time ON analytics_events(scope,created_at);
 
 CREATE TABLE IF NOT EXISTS stores (scope TEXT NOT NULL,id TEXT NOT NULL,record TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(scope,id));
+
+CREATE TABLE IF NOT EXISTS cached_pois (scope TEXT NOT NULL,provider TEXT NOT NULL,id TEXT NOT NULL,city TEXT NOT NULL DEFAULT '',category TEXT NOT NULL,lng REAL NOT NULL,lat REAL NOT NULL,record TEXT NOT NULL,fetched_at TEXT NOT NULL,PRIMARY KEY(scope,provider,id));
+CREATE INDEX IF NOT EXISTS cached_pois_geo ON cached_pois(scope,category,lng,lat);
+CREATE TABLE IF NOT EXISTS cache_runs (scope TEXT NOT NULL,run_key TEXT NOT NULL,provider TEXT NOT NULL,city TEXT NOT NULL DEFAULT '',record TEXT NOT NULL,fetched_at TEXT NOT NULL,PRIMARY KEY(scope,run_key));

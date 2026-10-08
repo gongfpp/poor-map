@@ -6,26 +6,129 @@ import {
   type Category,
 } from "./domain";
 import { WATER_API } from "./config";
+import { track } from "./telemetry";
+function validSavedStore(s: any): s is Store {
+  return (
+    s &&
+    typeof s.id === "string" &&
+    /^[\w-]{1,160}$/.test(s.id) &&
+    typeof s.name === "string" &&
+    s.name.trim() &&
+    s.name.length <= 80 &&
+    typeof s.address === "string" &&
+    ["amap", "tianditu", "tencent", "baidu"].includes(s.source) &&
+    ["discount", "mixue", "market"].includes(s.category) &&
+    Array.isArray(s.location) &&
+    s.location.length === 2 &&
+    s.location.every(Number.isFinite) &&
+    s.location[0] >= 72 &&
+    s.location[0] <= 138 &&
+    s.location[1] >= 0.8 &&
+    s.location[1] <= 56
+  );
+}
 export async function discoverAmap(
   center: [number, number],
   radius: number,
   water = false,
   signal?: AbortSignal,
+  refresh = false,
+  provider = "auto",
+  filters: { category?: string; query?: string } = {},
 ) {
   const anchor = center.map((n) => Number(n.toFixed(3))).join(",");
-  const r = await fetch(
-    `${WATER_API}/api/water/candidates?mode=${water ? "water" : "home"}&center=${anchor}&radius=${radius}`,
-    { signal },
-  );
-  const d = await r.json();
-  if (!r.ok || !d.configured)
-    throw new Error(d.error || "高德附近门店检索尚未配置。");
+  let d;
+  if (refresh) track("cache_refresh_start");
+  try {
+    const r = await fetch(
+      `${WATER_API}/api/water/candidates?mode=${water ? "water" : "home"}&center=${anchor}&radius=${radius}&category=${encodeURIComponent(filters.category || "all")}&query=${encodeURIComponent(filters.query || "")}`,
+      refresh
+        ? {
+            signal,
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              center: center.map((n) => Number(n.toFixed(3))),
+              radius,
+              mode: water ? "water" : "home",
+              provider,
+              ...filters,
+            }),
+          }
+        : { signal },
+    );
+    d = await r.json();
+    if (!r.ok || !d.configured)
+      throw new Error(d.error || "保存的门店暂时无法读取。");
+    if (!Array.isArray(d.stores)) throw new Error("门店数据格式无效。");
+    d.stores = d.stores.filter(validSavedStore);
+    try {
+      const old = JSON.parse(
+        localStorage.getItem("poor-map:places:" + (water ? "water" : "home")) ||
+          "[]",
+      );
+      const all = new Map(
+        (Array.isArray(old) ? old.filter(validSavedStore) : []).map(
+          (s: Store) => [s.id, s],
+        ),
+      );
+      for (const s of d.stores) {
+        all.delete(s.id);
+        all.set(s.id, s);
+      }
+      localStorage.setItem(
+        "poor-map:places:" + (water ? "water" : "home"),
+        JSON.stringify([...all.values()].slice(-2000)),
+      );
+    } catch {}
+  } catch (e) {
+    if (refresh) track("cache_refresh_error");
+    if (signal?.aborted || refresh) throw e;
+    let saved: Store[] = [];
+    try {
+      saved = JSON.parse(
+        localStorage.getItem("poor-map:places:" + (water ? "water" : "home")) ||
+          "[]",
+      );
+    } catch {}
+    if (!Array.isArray(saved) || !saved.length) throw e;
+    d = {
+      stores: saved.filter(validSavedStore),
+      configured: true,
+      offline: true,
+      cacheOnly: true,
+      warnings: ["无法连接服务器，显示本浏览器保存的门店副本。"],
+    };
+  }
+  track(refresh ? "cache_refresh_success" : "cache_read", {
+    count: d.stores.length,
+    status: d.offline ? "unavailable" : "success",
+    source: d.provider,
+  });
   return {
+    ...d,
     stores: d.stores.filter(
-      (s: Store) => distance(center, s.location) <= radius,
+      (s: Store) =>
+        distance(center, s.location) <= radius &&
+        (!filters.category ||
+          filters.category === "all" ||
+          s.category === filters.category) &&
+        (!filters.query?.trim() ||
+          (s.name + " " + s.address)
+            .toLowerCase()
+            .includes(filters.query.trim().toLowerCase())),
     ) as Store[],
     warnings: d.warnings || [],
   };
+}
+export function cacheDescription(data: any) {
+  if (data.offline) return "离线门店副本 · 未更新。";
+  if (!data.stores.length)
+    return data.note || "附近还没有保存的门店，请手动刷新。";
+  const at = data.fetchedAt
+    ? new Date(data.fetchedAt).toLocaleDateString("zh-CN")
+    : "";
+  return `已保存 ${data.stores.length} 家门店${at ? " · " + at : ""} · 只手动更新。${data.limited ? "结果较多，仅展示最近500家。" : ""}${(data.warnings || []).join(" ")}`;
 }
 const brands: [Category, string][] = [
   ["mixue", "蜜雪冰城"],
@@ -232,15 +335,8 @@ export function mergeStores(community: Store[], candidates: Store[]): Store[] {
   const result = [...community];
   for (const s of candidates) {
     if (result.some((x) => x.id === s.id || x.amapId === s.id)) continue;
-    // Preserve the community identity and its user-selected position; never migrate prices/comments on a fuzzy brand match.
-    const same = result.some(
-      (x) =>
-        x.category === s.category &&
-        x.name.replace(/[\s·（）()]/g, "") ===
-          s.name.replace(/[\s·（）()]/g, "") &&
-        distance(x.location, s.location) <= 100,
-    );
-    if (!same) result.push(s);
+    // Unknown cross-source identities remain separate, even for nearby same-name shops.
+    result.push(s);
   }
   return result;
 }

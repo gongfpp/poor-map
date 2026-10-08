@@ -5,6 +5,11 @@ const png = Buffer.from(
   "base64",
 );
 test.beforeEach(async ({ page }) => {
+  await page.route("**/api/water/candidates**", (r) =>
+    r.fulfill({
+      json: { stores: [], configured: true, cacheOnly: true, warnings: [] },
+    }),
+  );
   await page.route("https://api.tianditu.gov.cn/v2/search**", (r) =>
     r.fulfill({ json: { status: { infocode: 3001 }, count: 0 } }),
   );

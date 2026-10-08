@@ -57,7 +57,8 @@ try {
           await r.fulfill({
             status: upstream.status,
             headers: {
-              "Content-Type": upstream.headers.get("content-type") || "application/json",
+              "Content-Type":
+                upstream.headers.get("content-type") || "application/json",
               "Access-Control-Allow-Origin": new URL(url).origin,
             },
             body: await upstream.text(),
@@ -114,7 +115,16 @@ try {
             u.includes("/_AMapService/")),
       ),
     );
-    assert.deepEqual(errors, []);
+    assert.deepEqual(
+      errors,
+      [],
+      JSON.stringify(
+        badResponses.map((r) => ({
+          path: new URL(r.url).pathname,
+          status: r.status,
+        })),
+      ),
+    );
     assert.deepEqual(badResponses, []);
     results.push({
       viewport: name,

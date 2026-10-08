@@ -1,3 +1,4 @@
+import { writesPaused } from "./availability.mjs";
 import { seedStores, validateStore } from "../src/store-domain.ts";
 import { correctStorePoint } from "./reference-migration.mjs";
 import { eventNames, cleanProperties } from "../src/telemetry-schema.ts";
@@ -12,7 +13,13 @@ export async function communityRoute(
   if (path === "/api/community/qa" && req.method === "DELETE") {
     if (!isQA) return output({ error: "未授权。" }, 403);
     await env.DB.batch(
-      ["comments", "analytics_events", "stores"].map((t) =>
+      [
+        "comments",
+        "analytics_events",
+        "stores",
+        "cached_pois",
+        "cache_runs",
+      ].map((t) =>
         env.DB.prepare(`DELETE FROM ${t} WHERE scope=?`).bind(scope),
       ),
     );
@@ -20,15 +27,27 @@ export async function communityRoute(
   }
   if (path === "/api/community/stores") {
     if (req.method === "GET") {
-      if (scope === "public")
-        await env.DB.batch(
-          seedStores.map((s) =>
-            env.DB.prepare(
-              "INSERT OR IGNORE INTO stores(scope,id,record,created_at) VALUES(?,?,?,?)",
-            ).bind(scope, s.id, JSON.stringify(s), s.createdAt),
-          ),
-        );
-      if (scope === "public") await correctStorePoint(env);
+      if (scope === "public") {
+        const missing = [];
+        for (const s of seedStores)
+          if (
+            !(await env.DB.prepare(
+              "SELECT id FROM stores WHERE scope=? AND id=?",
+            )
+              .bind(scope, s.id)
+              .first())
+          )
+            missing.push(s);
+        if (missing.length && !writesPaused(env))
+          await env.DB.batch(
+            missing.map((s) =>
+              env.DB.prepare(
+                "INSERT OR IGNORE INTO stores(scope,id,record,created_at) VALUES(?,?,?,?)",
+              ).bind(scope, s.id, JSON.stringify(s), s.createdAt),
+            ),
+          );
+        if (!writesPaused(env)) await correctStorePoint(env);
+      }
       const rows = await env.DB.prepare(
         "SELECT record FROM stores WHERE scope=? ORDER BY created_at DESC LIMIT 1000",
       )

@@ -1,5 +1,4 @@
 import { distance } from "../src/domain.ts";
-const cache = new Map();
 const homeGroups = [
   ["discount", "赵一鸣零食|零食很忙|零食有鸣|好特卖|嗨特购|奥特乐"],
   ["mixue", "蜜雪冰城"],
@@ -22,14 +21,6 @@ export async function amapDiscovery(url, env, amap) {
   )
     return { error: "查询中心或范围无效。", status: 400 };
   const center = point.map((n) => Number(n.toFixed(3)));
-  const cacheKey = JSON.stringify([
-    env.AMAP_WEB_SERVICE_KEY,
-    mode,
-    center,
-    radius,
-  ]);
-  if (cache.get(cacheKey)?.expires > Date.now())
-    return cache.get(cacheKey).data;
   const groups =
     mode === "home" ? homeGroups : [homeGroups[0], ["market", "三江购物|超市"]];
   const results = await Promise.allSettled(
@@ -83,6 +74,7 @@ export async function amapDiscovery(url, env, amap) {
       )
         continue;
       if (r.value.category === "mixue" && !name.includes("蜜雪冰城")) continue;
+      if (found.has(p.id) && found.get(p.id).category === "discount") continue;
       found.set(p.id, {
         id: p.id,
         name: name.slice(0, 80),
@@ -101,9 +93,5 @@ export async function amapDiscovery(url, env, amap) {
   if (results.every((r) => r.status === "rejected"))
     return { error: "高德附近门店检索暂不可用，请稍后重试。", status: 502 };
   const data = { stores: [...found.values()], configured: true, warnings };
-  if (!warnings.some((w) => w.includes("暂不可用"))) {
-    cache.set(cacheKey, { expires: Date.now() + 300000, data });
-    if (cache.size > 100) cache.delete(cache.keys().next().value);
-  }
   return data;
 }

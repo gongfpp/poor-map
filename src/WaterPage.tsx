@@ -1,4 +1,6 @@
-import { discoverStores, discoverAmap } from "./discovery";
+import { preferredMap, rememberMap } from "./map-preference";
+import { storeSourceName } from "./domain";
+import { discoverStores, discoverAmap, cacheDescription } from "./discovery";
 import { track } from "./telemetry";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -96,11 +98,13 @@ export default function WaterPage() {
     [ready, setReady] = useState(false),
     [refresh, setRefresh] = useState(0),
     [tick, setTick] = useState(0);
+  const [mapChoice, setMapChoice] = useState(preferredMap);
   const [config, setConfig] = useState({
       provider: "amap" as "amap" | "tianditu",
       jsKey: "",
       mapReady: false,
       searchReady: false,
+      writeReady: true,
     }),
     [candidates, setCandidates] = useState<Store[]>([]),
     [candidateNote, setCandidateNote] = useState("正在检查周边门店服务…");
@@ -206,83 +210,46 @@ export default function WaterPage() {
   }, [refresh]);
   useEffect(() => {
     const controller = new AbortController();
-    api("/config", { signal: controller.signal })
+    api(`/config?map=${mapChoice}`, { signal: controller.signal })
       .then((data) => {
         setConfig(data);
-        if (!data.searchReady && !(data.provider === "tianditu" && data.jsKey))
-          setCandidateNote(
-            "自动搜店暂未开通。已收录水价可正常查看，也可以手动补充门店。",
-          );
       })
       .catch(() =>
         setCandidateNote("门店检索暂时无法连接，已收录水价仍可查看。"),
       );
     return () => controller.abort();
-  }, [refresh]);
-  useEffect(() => {
-    if (
-      !config.searchReady &&
-      !(config.provider === "tianditu" && config.jsKey)
-    ) {
-      setCandidates([]);
-      setCandidateNote(
-        "自动搜店暂未开通。已收录水价可正常查看，也可以手动补充门店。",
+  }, [refresh, mapChoice]);
+  const candidateRequest = useRef<AbortController | null>(null);
+  async function loadSavedCandidates(manual = false) {
+    candidateRequest.current?.abort();
+    const c = new AbortController();
+    candidateRequest.current = c;
+    setCandidateNote(
+      manual ? "正在手动刷新附近门店…" : "正在读取保存的候选店…",
+    );
+    try {
+      const data = await discoverAmap(
+        center,
+        filters.radius,
+        true,
+        c.signal,
+        manual,
       );
-      return;
+      if (c.signal.aborted) return;
+      setCandidates(data.stores);
+      setCandidateNote(cacheDescription(data));
+    } catch (e) {
+      if (!c.signal.aborted)
+        setCandidateNote((e as Error).message + " 仍保留已读候选。");
     }
-    const controller = new AbortController();
-    setCandidates([]);
-    setCandidateNote("正在找周边可能卖便宜水的超市…");
-    track("query_start", {
-      source: config.provider === "tianditu" ? "tianditu" : "amap",
-      radius: filters.radius,
-    });
-    (config.provider === "tianditu" && config.jsKey
-      ? discoverStores(
-          config.jsKey,
-          center,
-          filters.radius,
-          true,
-          controller.signal,
-          fetch,
-          setCandidates,
-        )
-      : discoverAmap(center, filters.radius, true, controller.signal)
-    )
-      .then((data) => {
-        track("query_success", {
-          source: config.provider === "tianditu" ? "tianditu" : "amap",
-          count: data.stores.length,
-        });
-        setCandidates(data.stores);
-        setCandidateNote(
-          data.warnings?.length
-            ? data.warnings.join(" ")
-            : "这些超市可能卖便宜水，具体商品、价格和库存需要用户补充。",
-        );
-      })
-      .catch((e) => {
-        if (e.name !== "AbortError") {
-          track("query_error", {
-            source: config.provider === "tianditu" ? "tianditu" : "amap",
-          });
-          setCandidates([]);
-          setCandidateNote(e.message);
-        }
-      });
-    return () => controller.abort();
-  }, [
-    center,
-    filters.radius,
-    config.searchReady,
-    config.provider,
-    config.jsKey,
-    refresh,
-  ]);
+  }
+  useEffect(() => {
+    void loadSavedCandidates();
+    return () => candidateRequest.current?.abort();
+  }, [center, filters.radius, refresh]);
   useEffect(() => {
     const timer = setInterval(() => {
       setTick((t) => t + 1);
-      setRefresh((r) => r + 1);
     }, 60000);
     return () => clearInterval(timer);
   }, []);
@@ -389,7 +356,7 @@ export default function WaterPage() {
         </nav>
         <button
           className="water-primary"
-          disabled={!ready}
+          disabled={!ready || config.writeReady === false}
           onClick={() => edit()}
         >
           <Plus size={16} />
@@ -406,6 +373,18 @@ export default function WaterPage() {
             <div>
               <strong>{position}</strong>
             </div>
+            <select
+              aria-label="底图来源"
+              value={mapChoice}
+              onChange={(e) => {
+                setMapChoice(e.target.value as "amap" | "tianditu");
+                rememberMap(e.target.value);
+                track("map_provider_change", { source: e.target.value });
+              }}
+            >
+              <option value="amap">高德</option>
+              <option value="tianditu">天地图</option>
+            </select>
             <button onClick={locate} disabled={locating}>
               <LocateFixed size={15} />
               {locating ? "定位中…" : "重新定位"}
@@ -416,6 +395,11 @@ export default function WaterPage() {
               看宁波线索
             </button>
           </div>
+          {config.writeReady === false && (
+            <p className="discovery-note" role="status">
+              共享提交暂限额 · 北京时间08:00恢复
+            </p>
+          )}
           <section className="water-toolbox">
             <label className="water-search">
               <Search size={17} />
@@ -649,7 +633,10 @@ export default function WaterPage() {
                       </div>
                     )}
                     <div className="water-offer-actions">
-                      <button onClick={() => edit(o)} disabled={!ready}>
+                      <button
+                        onClick={() => edit(o)}
+                        disabled={!ready || config.writeReady === false}
+                      >
                         <Pencil size={14} />
                         编辑 / 补信息
                       </button>
@@ -659,7 +646,7 @@ export default function WaterPage() {
                           setModal("feedback");
                           track("water_feedback", { action: "open" });
                         }}
-                        disabled={!ready}
+                        disabled={!ready || config.writeReady === false}
                       >
                         <MessageSquare size={14} />
                         反馈
@@ -714,22 +701,31 @@ export default function WaterPage() {
                 <ShoppingBag size={16} />
                 可能有便宜水的店 <b>{candidates.length}</b>
               </summary>
-              <p>{candidateNote}</p>
+              <p>
+                {candidateNote}{" "}
+                <button
+                  disabled={config.writeReady === false}
+                  onClick={() => void loadSavedCandidates(true)}
+                >
+                  刷新门店
+                </button>
+              </p>
               {candidates.map((s) => (
                 <div key={s.id}>
                   <span>
                     <strong>{s.name}</strong>
                     <small>
                       {distanceText(distance(center, s.location))} ·
-                      {s.source === "tianditu"
-                        ? " 天地图 ·"
-                        : s.source === "amap"
-                          ? " 高德 ·"
-                          : ""}{" "}
+                      {storeSourceName(s.source)
+                        ? " " + storeSourceName(s.source) + " ·"
+                        : ""}{" "}
                       {linkedOffer(s.id) ? "已有社区水价" : "价格尚未收录"}
                     </small>
                   </span>
-                  <button disabled={!ready} onClick={() => chooseStore(s.id)}>
+                  <button
+                    disabled={!ready || config.writeReady === false}
+                    onClick={() => chooseStore(s.id)}
+                  >
                     {linkedOffer(s.id) ? "查看水价" : "补水价"}{" "}
                     <Plus size={12} />
                   </button>

@@ -23,7 +23,9 @@ export function createApp({ env = process.env, upstream = fetch } = {}) {
   app.use(["/api", "/_AMapService"], (req, res, next) => {
     if (
       env.QA_TOKEN &&
-      /^\/api\/(water|community|analytics)/.test(req.originalUrl) &&
+      /^\/api\/(water|community|analytics|discovery|navigation)/.test(
+        req.originalUrl,
+      ) &&
       req.get("X-QA-Token") === env.QA_TOKEN
     ) {
       next();
@@ -44,14 +46,26 @@ export function createApp({ env = process.env, upstream = fetch } = {}) {
   });
   const waterGuard = randomUUID();
   app.use(
-    ["/api/water", "/api/community", "/api/analytics"],
+    [
+      "/api/water",
+      "/api/community",
+      "/api/analytics",
+      "/api/discovery",
+      "/api/navigation",
+    ],
     async (req, res) => {
       try {
         const chunks = [];
         let bytes = 0;
+        const maxBytes =
+          req.originalUrl.startsWith("/api/discovery/import") &&
+          env.DATA_ADMIN_TOKEN &&
+          req.get("authorization") === `Bearer ${env.DATA_ADMIN_TOKEN}`
+            ? 350000
+            : 8192;
         for await (const chunk of req) {
           bytes += chunk.length;
-          if (bytes > 8192) {
+          if (bytes > maxBytes) {
             res.status(413).json({ error: "内容过长。" });
             return;
           }

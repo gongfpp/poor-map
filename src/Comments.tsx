@@ -14,10 +14,12 @@ export default function Comments({
   storeId,
   storeName,
   onDone,
+  writable = true,
 }: {
   storeId: string;
   storeName: string;
   onDone?: () => void;
+  writable?: boolean;
 }) {
   const [comments, setComments] = useState<Comment[]>([]),
     [text, setText] = useState(""),
@@ -149,7 +151,7 @@ export default function Comments({
           <small>公开分享 · 未核验 · 请勿填写个人信息</small>
           <button
             className="primary-button"
-            disabled={busy || loading || !text.trim()}
+            disabled={!writable || busy || loading || !text.trim()}
           >
             {busy ? "发送中…" : reply ? "发送回复" : "分享"}
           </button>

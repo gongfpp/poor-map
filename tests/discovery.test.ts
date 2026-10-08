@@ -90,6 +90,11 @@ test("merging retains community identity and does not migrate comments on a fuzz
     duplicate = { ...user, id: "td-duplicate", source: "tianditu" as const },
     another = { ...duplicate, name: "好特卖另一店", id: "td-other" };
   const merged = mergeStores([user], [duplicate, another]);
-  assert.equal(merged.length, 2);
+  assert.equal(merged.length, 3);
   assert.equal(merged[0].id, user.id);
+  assert.equal(
+    mergeStores([user], [{ ...duplicate, id: user.amapId!, source: "amap" }])
+      .length,
+    1,
+  );
 });

@@ -1,3 +1,5 @@
+import { clusterStores } from "./map-clusters";
+import type { NavigationResult } from "./navigation-domain";
 import TiandituMapView from "./TiandituMapView";
 import { track } from "./telemetry";
 import { useEffect, useRef, useState } from "react";
@@ -43,6 +45,7 @@ function loadSdk(key: string, serviceHost?: string) {
   return sdkPromise;
 }
 export type MapProps = {
+  navigationRoute?: NavigationResult | null;
   provider?: "amap" | "tianditu";
   onPickLocation?: (point: [number, number]) => void;
   onReadyChange?: (ready: boolean) => void;
@@ -80,6 +83,7 @@ function LegacyMapView({
   waterMode = false,
   markerLabels,
   serviceHost,
+  navigationRoute,
 }: MapProps) {
   const host = useRef<HTMLDivElement>(null),
     map = useRef<any>(null),
@@ -87,6 +91,7 @@ function LegacyMapView({
     callbacks = useRef({ onSelect, onMove, onPickLocation, onReadyChange });
   const [mapState, setMapState] = useState(""),
     [zoom, setZoom] = useState(1),
+    [markerZoom, setMarkerZoom] = useState(15),
     [retry, setRetry] = useState(0),
     [ready, setReady] = useState(false);
   callbacks.current = { onSelect, onMove, onPickLocation, onReadyChange };
@@ -112,6 +117,7 @@ function LegacyMapView({
           viewMode: "2D",
           mapStyle: "amap://styles/normal",
         });
+        map.current.on("zoomend", () => setMarkerZoom(map.current.getZoom()));
         map.current.on("dragend", () => {
           const c = map.current?.getCenter();
           if (c) callbacks.current.onMove([c.lng, c.lat]);
@@ -157,9 +163,16 @@ function LegacyMapView({
   useEffect(() => {
     if (!map.current || !ready) return;
     map.current.remove(markers.current);
-    markers.current = stores.map((s) => {
+    const groups = waterMode
+      ? stores.map((s) => ({ stores: [s], location: s.location }))
+      : clusterStores(stores, markerZoom, selected);
+    markers.current = groups.map((group) => {
+      const s = group.stores[0],
+        clustered = group.stores.length > 1;
       const button = document.createElement("button");
       button.className = `pin ${selected === s.id ? "selected" : ""} ${eventIds.has(s.id) ? "event-pin" : ""}`;
+      if (clustered) button.classList.add("cluster-pin");
+      button.dataset.storeCount = String(group.stores.length);
       button.style.setProperty(
         "--pin-color",
         waterMode
@@ -168,20 +181,31 @@ function LegacyMapView({
             : "#c4a36f"
           : categories.find((c) => c.id === s.category)!.color,
       );
-      button.textContent =
-        markerLabels?.[s.id] ||
-        (waterMode
-          ? s.source === "community"
-            ? "水"
-            : "店"
-          : eventIds.has(s.id)
-            ? "免"
-            : categories.find((c) => c.id === s.category)!.short);
-      button.title = s.name;
-      button.setAttribute("aria-label", `查看 ${s.name}`);
-      button.onclick = () => callbacks.current.onSelect(s.id);
+      button.textContent = clustered
+        ? String(group.stores.length)
+        : markerLabels?.[s.id] ||
+          (waterMode
+            ? s.source === "community"
+              ? "水"
+              : "店"
+            : eventIds.has(s.id)
+              ? "免"
+              : categories.find((c) => c.id === s.category)!.short);
+      button.title = clustered
+        ? `${group.stores.length}家参考门店，点击展开`
+        : s.name;
+      button.setAttribute(
+        "aria-label",
+        clustered ? `展开附近${group.stores.length}家门店` : `查看 ${s.name}`,
+      );
+      button.onclick = () => {
+        if (clustered) {
+          map.current.setCenter(group.location);
+          map.current.setZoom(Math.min(19, markerZoom + 2));
+        } else callbacks.current.onSelect(s.id);
+      };
       return new window.AMap.Marker({
-        position: s.location,
+        position: group.location,
         content: button,
         offset: new window.AMap.Pixel(-22, -45),
         zIndex: selected === s.id ? 200 : 100,
@@ -191,7 +215,7 @@ function LegacyMapView({
     return () => {
       if (map.current) map.current.remove(markers.current);
     };
-  }, [stores, selected, ready, eventIds, waterMode, markerLabels]);
+  }, [stores, selected, ready, eventIds, waterMode, markerLabels, markerZoom]);
   useEffect(() => {
     const store = stores.find((s) => s.id === selected);
     if (ready && store) map.current?.panTo?.(store.location);
@@ -220,6 +244,18 @@ function LegacyMapView({
     map.current.add([ring, point]);
     return () => map.current?.remove([ring, point]);
   }, [center, radiusMeters, ready]);
+  useEffect(() => {
+    if (!ready || !map.current || !navigationRoute) return;
+    const line = new window.AMap.Polyline({
+      path: navigationRoute.polyline,
+      strokeColor: "#7353bf",
+      strokeWeight: 6,
+      strokeOpacity: 0.9,
+    });
+    map.current.add(line);
+    map.current.setFitView?.([line], false, [90, 80, 80, 80]);
+    return () => map.current?.remove(line);
+  }, [navigationRoute, ready]);
   function changeZoom(delta: number) {
     track("map_zoom", { action: delta > 0 ? "zoom_in" : "zoom_out" });
     if (map.current) map.current.setZoom(map.current.getZoom() + delta);

@@ -35,7 +35,9 @@ try {
       try {
         const d = await r.json();
         queries.push({
-          source: "amap",
+          source: "cache",
+          cached: d.cacheOnly,
+          method: r.request().method(),
           mode: u.searchParams.get("mode"),
           status: r.status(),
           reportedCount: d.stores?.length || 0,
@@ -58,16 +60,23 @@ try {
     }
   });
   await page.goto(url, { waitUntil: "domcontentloaded" });
-  await expect(page.locator(".discovery-note")).toContainText("自动检索到", {
+  await expect(page.locator(".discovery-note")).toContainText("已保存", {
     timeout: 60000,
   });
   const sourceCards = page.locator(".store-card").filter({ hasText: label });
+  await expect
+    .poll(() => sourceCards.count(), { timeout: 15000 })
+    .toBeGreaterThan(0);
   const homeCount = await sourceCards.count();
   assert.ok(homeCount > 0, "Real Ningbo provider results were not displayed.");
   assert.ok(
     queries.some((q) =>
       config.provider === "amap"
-        ? q.source === "amap" && q.status === 200 && q.reportedCount > 0
+        ? q.source === "cache" &&
+          q.cached &&
+          q.method === "GET" &&
+          q.status === 200 &&
+          q.reportedCount > 0
         : q.keyword === "蜜雪冰城" && q.status === 200 && q.code === 1000,
     ),
   );
@@ -89,7 +98,7 @@ try {
   await page.screenshot({ path: "/tmp/poor-map-discovery-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload({ waitUntil: "domcontentloaded" });
-  await expect(page.locator(".discovery-note")).toContainText("自动检索到", {
+  await expect(page.locator(".discovery-note")).toContainText("已保存", {
     timeout: 60000,
   });
   await page.getByRole("button", { name: "看列表", exact: true }).click();

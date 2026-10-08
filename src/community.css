@@ -223,3 +223,49 @@
     left: 12px;
   }
 }
+.city-search {
+  width: 100%;
+  border: 1px solid #e1daed;
+  border-radius: 8px;
+  padding: 10px;
+  font: inherit;
+}
+.city-grid {
+  max-height: 46dvh;
+  overflow: auto;
+}
+.city-grid button {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+}
+.city-grid small {
+  font-size: 10px;
+  color: #91869f;
+  font-weight: 400;
+}
+.provider-row select,
+.water-location select {
+  border: 1px solid #e1daed;
+  background: white;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 11px;
+  padding: 6px;
+  color: #706081;
+}
+.pin.cluster-pin {
+  border-radius: 50%;
+  color: #6842bc;
+  border-color: #8762d0;
+  background: #fff;
+  font-size: 14px;
+  box-shadow:
+    0 0 0 4px #8564ca26,
+    0 2px 6px #44375930;
+}
+.pin.cluster-pin:after,
+.pin.cluster-pin:before {
+  display: none;
+}

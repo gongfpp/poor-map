@@ -1,3 +1,4 @@
+import { collectionCenters } from "./collection-centers.ts";
 export type Category =
   "snack" | "discount" | "daily" | "market" | "meal" | "mixue";
 export type DealKind = "free" | "checkin" | "discount";
@@ -11,8 +12,9 @@ export type Store = {
   locationPrecision?: "poi" | "area";
   price?: number;
   priceNote?: string;
-  source: "demo" | "amap" | "community" | "tianditu";
+  source: "demo" | "amap" | "community" | "tianditu" | "tencent" | "baidu";
   amapId?: string;
+  cachedAt?: string;
 };
 export type Deal = {
   id: string;
@@ -102,11 +104,7 @@ export const activeCategories = [
 categories.push(activeCategories[1]);
 export const cities = [
   { name: "宁波", center: [121.55027, 29.87386] as [number, number] },
-  { name: "杭州", center: [120.15507, 30.27408] as [number, number] },
-  { name: "上海", center: [121.4737, 31.2304] as [number, number] },
-  { name: "北京", center: [116.3974, 39.9092] as [number, number] },
-  { name: "广州", center: [113.2644, 23.1291] as [number, number] },
-  { name: "深圳", center: [114.0579, 22.5431] as [number, number] },
+  ...collectionCenters.filter((c) => c.name !== "宁波"),
 ];
 export function distance(a: [number, number], b: [number, number]) {
   const rad = Math.PI / 180;
@@ -255,3 +253,13 @@ export function gcj02ToWgs84(point: [number, number]): [number, number] {
   }
   return estimate;
 }
+
+export const storeSourceName = (source?: Store["source"]) =>
+  (
+    ({
+      amap: "高德",
+      tianditu: "天地图",
+      tencent: "腾讯",
+      baidu: "百度",
+    }) as Record<string, string>
+  )[source || ""] || "";

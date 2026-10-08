@@ -12,7 +12,11 @@ export function currentLocation(force = false) {
         (p) => resolve(wgs84ToGcj02([p.coords.longitude, p.coords.latitude])),
         (e) =>
           reject(new Error(e.code === 1 ? "未获得定位权限" : "定位暂时失败")),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: force ? 0 : 300000,
+        },
       );
     });
   return pending;

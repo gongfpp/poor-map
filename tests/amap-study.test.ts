@@ -41,6 +41,7 @@ test("AMap home discovery enables only the two categories, filters headquarters/
     },
   );
   assert.equal(calls, 2);
+  assert.ok("stores" in data);
   assert.equal(data.stores.length, 2);
   assert.deepEqual(
     data.stores.map((s: any) => s.category),
@@ -61,6 +62,7 @@ test("failed AMap brands remain partial; invalid inputs never call the provider"
     { AMAP_WEB_SERVICE_KEY: crypto.randomUUID() },
     fn,
   );
+  assert.ok("warnings" in d);
   assert.equal(d.warnings.length, 1);
   assert.ok(d.configured);
   const bad = await amapDiscovery(
@@ -70,6 +72,7 @@ test("failed AMap brands remain partial; invalid inputs never call the provider"
       throw Error("must not call");
     },
   );
+  assert.ok("status" in bad);
   assert.equal(bad.status, 400);
 });
 test("initial HotMaxx correction is idempotent, keeps comments identity and records a price-preserving revision", async () => {
