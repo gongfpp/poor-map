@@ -87,7 +87,11 @@ try {
     await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
   );
   await p.getByRole("button", { name: "看列表", exact: true }).click();
-  await p.locator(".store-open").first().click();
+  await p
+    .locator(".store-card")
+    .filter({ hasText: "隔离真实底图选点" })
+    .locator(".store-open")
+    .click();
   await expect(p.locator(".detail-card")).toContainText("用户标记");
   await expect(p.getByRole("button", { name: "关闭门店详情" })).toBeVisible();
   await p.getByRole("button", { name: "关闭门店详情" }).click();

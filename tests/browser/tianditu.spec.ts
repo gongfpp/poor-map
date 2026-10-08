@@ -4,6 +4,11 @@ const png = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR6kAAAAASUVORK5CYII=",
   "base64",
 );
+test.beforeEach(async ({ page }) => {
+  await page.route("https://api.tianditu.gov.cn/v2/search**", (r) =>
+    r.fulfill({ json: { status: { infocode: 3001 }, count: 0 } }),
+  );
+});
 test("map tiles gate picking, explicit map click creates a shared store, attribution stays visible", async ({
   page,
 }) => {

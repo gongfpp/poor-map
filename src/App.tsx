@@ -1,3 +1,4 @@
+import { discoverStores, mergeStores, clearDiscoveryCache } from "./discovery";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bookmark,
@@ -58,6 +59,9 @@ export default function App() {
     [feed, setFeed] = useState("nearby"),
     [saved, setSaved] = useState(readSaved),
     [live, setLive] = useState<Store[]>([]),
+    [nearby, setNearby] = useState<Store[]>([]),
+    [discoveryNote, setDiscoveryNote] = useState("正在检查附近门店检索…"),
+    [discovering, setDiscovering] = useState(false),
     [selected, setSelected] = useState<string | null>(null),
     [modal, setModal] = useState<"city" | "config" | "report" | "store" | null>(
       null,
@@ -105,7 +109,48 @@ export default function App() {
       });
     return () => c.abort();
   }, [refresh]);
-  const stores = live;
+  const stores = useMemo(() => mergeStores(live, nearby), [live, nearby]);
+  useEffect(() => {
+    if (config.provider !== "tianditu" || !config.jsKey) {
+      setNearby([]);
+      setDiscovering(false);
+      setDiscoveryNote("自动检索暂不可用，仍可查看共享门店。");
+      return;
+    }
+    const c = new AbortController();
+    setNearby([]);
+    setDiscovering(true);
+    setDiscoveryNote("正在查找附近品牌门店…");
+    track("query_start", { radius });
+    discoverStores(
+      config.jsKey,
+      center,
+      radius,
+      false,
+      c.signal,
+      fetch,
+      setNearby,
+    )
+      .then((d) => {
+        setNearby(d.stores);
+        track("query_success", { source: "tianditu", count: d.stores.length });
+        setDiscoveryNote(
+          d.warnings.length
+            ? `自动检索到 ${d.stores.length} 家候选。${d.warnings.join(" ")}`
+            : `自动检索到 ${d.stores.length} 家候选。地图收录可能不全，营业及优惠由用户补充。`,
+        );
+      })
+      .catch((e) => {
+        if (e.name !== "AbortError") {
+          setDiscoveryNote(e.message);
+          track("query_error", { source: "tianditu" });
+        }
+      })
+      .finally(() => {
+        if (!c.signal.aborted) setDiscovering(false);
+      });
+    return () => c.abort();
+  }, [config.provider, config.jsKey, center, radius, refresh]);
   const visible = useMemo(
     () =>
       stores
@@ -310,7 +355,7 @@ export default function App() {
           <button
             className="contribute"
             aria-label="分享省钱线索"
-            disabled={loading || !stores.length}
+            disabled={!stores.length}
             onClick={share}
           >
             <Plus size={17} />
@@ -417,9 +462,21 @@ export default function App() {
             </label>
             <span className="distance-note">按直线距离排序</span>
           </div>
+          <p className="discovery-note" role="status">
+            {discoveryNote}
+            <button
+              disabled={discovering}
+              onClick={() => {
+                clearDiscoveryCache();
+                setRefresh((n) => n + 1);
+              }}
+            >
+              重查
+            </button>
+          </p>
           <div className="result-heading">
             <span>
-              {loading ? (
+              {(loading || discovering) && !visible.length ? (
                 "正在寻找附近门店…"
               ) : (
                 <>
@@ -428,11 +485,11 @@ export default function App() {
               )}
             </span>
           </div>
-          <div className="results" aria-busy={loading}>
+          <div className="results" aria-busy={loading || discovering}>
             {error && (
               <div className="empty-state">
                 <CircleHelp />
-                <h3>暂时没能找到门店</h3>
+                <h3>共享门店暂时无法读取</h3>
                 <p>{error}</p>
                 <button
                   className="primary-button"
@@ -442,9 +499,10 @@ export default function App() {
                 </button>
               </div>
             )}
-            {loading &&
+            {(loading || discovering) &&
+              !visible.length &&
               [0, 1, 2].map((i) => <div className="skeleton" key={i} />)}
-            {!loading && !error && !visible.length && (
+            {!loading && !discovering && !error && !visible.length && (
               <div className="empty-state">
                 <Search />
                 <h3>
@@ -478,64 +536,63 @@ export default function App() {
                 </button>
               </div>
             )}
-            {!loading &&
-              !error &&
-              visible.map((s) => {
-                const cat =
-                  activeCategories.find((c) => c.id === s.category) ||
-                  activeCategories[0];
-                return (
-                  <article
-                    className={`store-card ${selected === s.id ? "selected" : ""}`}
-                    key={s.id}
-                  >
-                    <div className="store-top">
-                      <button
-                        className="store-open"
-                        onClick={() => select(s.id)}
+            {visible.map((s) => {
+              const cat =
+                activeCategories.find((c) => c.id === s.category) ||
+                activeCategories[0];
+              return (
+                <article
+                  className={`store-card ${selected === s.id ? "selected" : ""}`}
+                  key={s.id}
+                >
+                  <div className="store-top">
+                    <button className="store-open" onClick={() => select(s.id)}>
+                      <span
+                        className="store-avatar"
+                        style={{
+                          background: `${cat.color}20`,
+                          color: cat.color,
+                        }}
                       >
-                        <span
-                          className="store-avatar"
-                          style={{
-                            background: `${cat.color}20`,
-                            color: cat.color,
-                          }}
-                        >
-                          {s.category === "mixue" ? (
-                            <IceCreamBowl size={25} />
-                          ) : (
-                            <ShoppingBag size={25} />
-                          )}
+                        {s.category === "mixue" ? (
+                          <IceCreamBowl size={25} />
+                        ) : (
+                          <ShoppingBag size={25} />
+                        )}
+                      </span>
+                      <span className="store-title">
+                        <strong>{s.name}</strong>
+                        <span>
+                          {cat.label} ·{" "}
+                          {s.locationPrecision === "area" ? "约 " : ""}
+                          {distanceText(distance(center, s.location))} · 直线
+                          {s.source === "tianditu"
+                            ? " · 天地图"
+                            : s.source === "demo"
+                              ? " · 演示"
+                              : ""}
                         </span>
-                        <span className="store-title">
-                          <strong>{s.name}</strong>
-                          <span>
-                            {cat.label} ·{" "}
-                            {s.locationPrecision === "area" ? "约 " : ""}
-                            {distanceText(distance(center, s.location))} · 直线
-                            {s.source === "demo" ? " · 演示" : ""}
-                          </span>
-                        </span>
-                      </button>
-                      <button
-                        className={`save-button ${saved.includes(s.id) ? "saved" : ""}`}
-                        aria-label={`${saved.includes(s.id) ? "取消收藏" : "收藏"} ${s.name}`}
-                        aria-pressed={saved.includes(s.id)}
-                        onClick={() => save(s.id)}
-                      >
-                        <Bookmark
-                          size={18}
-                          fill={saved.includes(s.id) ? "currentColor" : "none"}
-                        />
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
+                      </span>
+                    </button>
+                    <button
+                      className={`save-button ${saved.includes(s.id) ? "saved" : ""}`}
+                      aria-label={`${saved.includes(s.id) ? "取消收藏" : "收藏"} ${s.name}`}
+                      aria-pressed={saved.includes(s.id)}
+                      onClick={() => save(s.id)}
+                    >
+                      <Bookmark
+                        size={18}
+                        fill={saved.includes(s.id) ? "currentColor" : "none"}
+                      />
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
           </div>
           <div className="sidebar-footer">
             <span className={`status-dot ${demo ? "" : "live"}`} />
-            {demo ? "演示门店 · 不能用于出行" : "共享门店 · 用户标记"}
+            {demo ? "演示门店 · 不能用于出行" : "地图检索 + 社区线索"}
             <button onClick={() => open("config")}>
               数据说明
               <ExternalLink size={11} />
@@ -584,7 +641,7 @@ export default function App() {
             canLocate={true}
           />
           <div className="compact-map-status">
-            <span>{picking ? "点地图标记门店" : "共享门店"}</span>
+            <span>{picking ? "点地图标记门店" : "附近门店 · 参考位置"}</span>
             <button
               onClick={() => (picking ? setPicking(false) : open("config"))}
             >
@@ -610,7 +667,11 @@ export default function App() {
                       ?.label
                   }{" "}
                   ·{" "}
-                  {current.source === "demo" ? "演示门店" : "用户标记 · 未核验"}
+                  {current.source === "tianditu"
+                    ? "天地图候选 · 营业状态待确认"
+                    : current.source === "demo"
+                      ? "演示门店"
+                      : "用户标记 · 未核验"}
                 </span>
                 <button
                   className="icon-button"
@@ -795,7 +856,7 @@ export default function App() {
       {modal === "config" && (
         <Modal title="数据从哪里来？" onClose={() => open(null)}>
           <p className="modal-copy">
-            底图来自天地图；门店、评论和水价来自共享线索库。当前收录仍少，分类不能证明当前商品价格或库存。
+            底图和候选门店来自天地图，社区补充门店、评论和水价。搜索每品牌最多取首批20家，地图收录可能不全，不能证明营业状态、商品价格或库存。
             收藏保存在当前浏览器；评论公开保存并允许回复纠错，均为未核验线索。
           </p>
           <div className="provider-row">
@@ -811,15 +872,19 @@ export default function App() {
             </button>
           )}
           <div className="provider-row">
-            <span>自动门店检索</span>
-            <b>{config.searchReady ? "已配置 · 本地测试" : "未接入"}</b>
+            <span>附近品牌门店检索</span>
+            <b>
+              {config.provider === "tianditu" && config.jsKey
+                ? "天地图 · 已配置"
+                : "暂不可用"}
+            </b>
           </div>
           <div className="provider-row">
             <span>美团 / 大众点评 / 抖音</span>
             <b>未接入</b>
           </div>
           <p className="form-hint">
-            门店位置与线索由用户提供，欢迎回复补充和纠错。商圈参考位置不能等同于准确铺位。
+            门店参考位置来自地图接口或用户标记，价格线索由用户提供，欢迎回复补充和纠错。商圈参考位置不能等同于准确铺位。查询中心取约100米精度发往天地图，不保存到店库、收藏ID或埋点。
           </p>
           <div className="privacy-control">
             <h3>使用统计</h3>

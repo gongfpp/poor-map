@@ -28,7 +28,7 @@ const headers = {
   };
 let browser;
 try {
-  await call("/api/community/stores", "POST", {
+  const { store: qaStore } = await call("/api/community/stores", "POST", {
     name: "隔离验收好特卖",
     category: "discount",
     address: "验收隔离数据",
@@ -48,6 +48,7 @@ try {
   await a.goto(url, { waitUntil: "domcontentloaded" });
   await a.locator(".store-card").first().waitFor();
   await a.getByRole("button", { name: "分享省钱线索" }).click();
+  await a.getByLabel("门店", { exact: true }).selectOption(qaStore.id);
   await a.getByLabel("一句话线索").fill("隔离验收：今天水价0.9元");
   await expect(
     a.getByRole("button", { name: "分享", exact: true }),
@@ -56,6 +57,7 @@ try {
   await expect(a.locator(".community-comment")).toHaveCount(1);
   await b.goto(url, { waitUntil: "domcontentloaded" });
   await b.getByRole("button", { name: "分享省钱线索" }).click();
+  await b.getByLabel("门店", { exact: true }).selectOption(qaStore.id);
   await expect(b.locator(".community-comment")).toContainText("隔离验收");
   await b.getByRole("button", { name: "回复 / 纠错" }).click();
   await b.getByLabel("一句话线索").fill("隔离纠错：容量需补充");
@@ -65,6 +67,7 @@ try {
   );
   await a.reload();
   await a.getByRole("button", { name: "分享省钱线索" }).click();
+  await a.getByLabel("门店", { exact: true }).selectOption(qaStore.id);
   await expect(a.locator(".community-comment")).toHaveCount(2);
   await a.screenshot({
     path: "/tmp/poor-map-community-live.png",

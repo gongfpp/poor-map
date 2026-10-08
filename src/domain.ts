@@ -11,7 +11,7 @@ export type Store = {
   locationPrecision?: "poi" | "area";
   price?: number;
   priceNote?: string;
-  source: "demo" | "amap" | "community";
+  source: "demo" | "amap" | "community" | "tianditu";
 };
 export type Deal = {
   id: string;

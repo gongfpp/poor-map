@@ -16,7 +16,8 @@
     "test:e2e": "playwright test",
     "analytics:report": "node --use-env-proxy scripts/analytics-report.mjs",
     "verify:community": "node --use-env-proxy scripts/verify-community.mjs",
-    "verify:map": "node --use-env-proxy scripts/verify-map.mjs"
+    "verify:map": "node --use-env-proxy scripts/verify-map.mjs",
+    "verify:discovery": "node --use-env-proxy scripts/verify-discovery.mjs"
   },
   "dependencies": {
     "dotenv": "^18.0.6",

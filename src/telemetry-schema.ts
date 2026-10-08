@@ -81,7 +81,7 @@ export function cleanProperties(
       "privacy",
     ],
     mode: ["demo", "live"],
-    source: ["demo", "amap", "community", "user"],
+    source: ["demo", "amap", "community", "user", "tianditu"],
     status: [
       "success",
       "error",

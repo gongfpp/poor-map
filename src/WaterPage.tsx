@@ -1,3 +1,4 @@
+import { discoverStores } from "./discovery";
 import { track } from "./telemetry";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -202,7 +203,7 @@ export default function WaterPage() {
     api("/config?map=tianditu", { signal: controller.signal })
       .then((data) => {
         setConfig(data);
-        if (!data.searchReady)
+        if (!data.searchReady && !(data.provider === "tianditu" && data.jsKey))
           setCandidateNote(
             "自动搜店暂未开通。已收录水价可正常查看，也可以手动补充门店。",
           );
@@ -213,7 +214,10 @@ export default function WaterPage() {
     return () => controller.abort();
   }, [refresh]);
   useEffect(() => {
-    if (!config.searchReady) {
+    if (
+      !config.searchReady &&
+      !(config.provider === "tianditu" && config.jsKey)
+    ) {
       setCandidates([]);
       setCandidateNote(
         "自动搜店暂未开通。已收录水价可正常查看，也可以手动补充门店。",
@@ -221,11 +225,31 @@ export default function WaterPage() {
       return;
     }
     const controller = new AbortController();
+    setCandidates([]);
     setCandidateNote("正在找周边可能卖便宜水的超市…");
-    api(`/candidates?center=${center.join(",")}&radius=${filters.radius}`, {
-      signal: controller.signal,
-    })
+    track("query_start", {
+      source: config.provider === "tianditu" ? "tianditu" : "amap",
+      radius: filters.radius,
+    });
+    (config.provider === "tianditu" && config.jsKey
+      ? discoverStores(
+          config.jsKey,
+          center,
+          filters.radius,
+          true,
+          controller.signal,
+          fetch,
+          setCandidates,
+        )
+      : api(`/candidates?center=${center.join(",")}&radius=${filters.radius}`, {
+          signal: controller.signal,
+        })
+    )
       .then((data) => {
+        track("query_success", {
+          source: config.provider === "tianditu" ? "tianditu" : "amap",
+          count: data.stores.length,
+        });
         setCandidates(data.stores);
         setCandidateNote(
           data.warnings?.length
@@ -235,12 +259,22 @@ export default function WaterPage() {
       })
       .catch((e) => {
         if (e.name !== "AbortError") {
+          track("query_error", {
+            source: config.provider === "tianditu" ? "tianditu" : "amap",
+          });
           setCandidates([]);
           setCandidateNote(e.message);
         }
       });
     return () => controller.abort();
-  }, [center, filters.radius, config.searchReady]);
+  }, [
+    center,
+    filters.radius,
+    config.searchReady,
+    config.provider,
+    config.jsKey,
+    refresh,
+  ]);
   useEffect(() => {
     const timer = setInterval(() => {
       setTick((t) => t + 1);
@@ -673,7 +707,7 @@ export default function WaterPage() {
                     <strong>{s.name}</strong>
                     <small>
                       {distanceText(distance(center, s.location))} ·
-                      价格尚未收录
+                      {s.source === "tianditu" ? " 天地图 ·" : ""} 价格尚未收录
                     </small>
                   </span>
                   <button disabled={!ready} onClick={() => chooseStore(s.id)}>
