@@ -1,15 +1,12 @@
 import { communityRoute } from "./community.mjs";
+import { amapDiscovery } from "./discovery.mjs";
+import { correctWaterPoint } from "./reference-migration.mjs";
 import { seedWater, validateWater } from "../src/water-domain.ts";
 const origins = new Set([
   "https://gongfpp.github.io",
   "http://127.0.0.1:5173",
   "http://localhost:5173",
 ]);
-const groups = [
-  ["snack", "赵一鸣零食|零食很忙|零食有鸣"],
-  ["discount", "好特卖|嗨特购|奥特乐"],
-  ["market", "三江购物|生鲜超市|超市"],
-];
 const cleanInput = (o) =>
   Object.fromEntries(
     [
@@ -183,72 +180,10 @@ export async function route(req, env) {
       });
     if (!(await rate(req, env, scope, 60, "search")))
       return output({ error: "搜店请求较频繁，请稍后重试。" }, 429);
-    const coords = (url.searchParams.get("center") || "")
-        .split(",")
-        .map(Number),
-      radius = Number(url.searchParams.get("radius"));
-    if (
-      coords.length !== 2 ||
-      !coords.every(Number.isFinite) ||
-      coords[0] < 72 ||
-      coords[0] > 138 ||
-      coords[1] < 0.8 ||
-      coords[1] > 56 ||
-      !Number.isInteger(radius) ||
-      radius < 100 ||
-      radius > 10000
-    )
-      return output({ error: "查询中心或范围无效。" }, 400);
-    const results = await Promise.allSettled(
-      groups.map(async ([category, keywords]) => {
-        const d = await amap(env, "/v3/place/around", {
-          location: coords.map((n) => n.toFixed(6)).join(","),
-          radius,
-          keywords,
-          offset: 25,
-          page: 1,
-          extensions: "base",
-          sortrule: "distance",
-        });
-        return { category, pois: d.pois || [], count: Number(d.count) || 0 };
-      }),
-    );
-    const found = new Map(),
-      warnings = [];
-    results.forEach((r, i) => {
-      if (r.status === "rejected") {
-        warnings.push(r.reason.message);
-        return;
-      }
-      if (r.value.count > r.value.pois.length)
-        warnings.push(`${groups[i][0]} 仅展示首批门店，可缩小范围。`);
-      for (const p of r.value.pois) {
-        const location = String(p.location || "")
-          .split(",")
-          .map(Number);
-        if (
-          p.id &&
-          location.length === 2 &&
-          location.every(Number.isFinite) &&
-          !found.has(p.id)
-        )
-          found.set(p.id, {
-            id: p.id,
-            name: p.name,
-            address: [p.cityname, p.adname, p.address]
-              .filter((x) => typeof x === "string")
-              .join(" "),
-            location,
-            category: r.value.category,
-            tags: ["可能卖水", "价格未收录"],
-            source: "amap",
-          });
-      }
-    });
-    if (results.every((r) => r.status === "rejected"))
-      return output({ error: warnings.join(" ") }, 502);
-    return output({ stores: [...found.values()], configured: true, warnings });
+    const result = await amapDiscovery(url, env, amap);
+    return output(result, result.status || 200);
   }
+
   if (path === "/api/water/geocode" && req.method === "GET") {
     if (!(await rate(req, env, scope, 30, "geocode")))
       return output({ error: "地址查询较频繁，请稍后重试。" }, 429);
@@ -269,6 +204,7 @@ export async function route(req, env) {
   }
   if (path === "/api/water" && req.method === "GET") {
     if (scope === "public") await seed(env);
+    if (scope === "public") await correctWaterPoint(env);
     const rows = await env.DB.prepare(
       "SELECT record FROM offers WHERE scope=? ORDER BY updated_at DESC LIMIT 1000",
     )

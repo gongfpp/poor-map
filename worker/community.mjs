@@ -1,4 +1,5 @@
 import { seedStores, validateStore } from "../src/store-domain.ts";
+import { correctStorePoint } from "./reference-migration.mjs";
 import { eventNames, cleanProperties } from "../src/telemetry-schema.ts";
 export async function communityRoute(
   req,
@@ -27,6 +28,7 @@ export async function communityRoute(
             ).bind(scope, s.id, JSON.stringify(s), s.createdAt),
           ),
         );
+      if (scope === "public") await correctStorePoint(env);
       const rows = await env.DB.prepare(
         "SELECT record FROM stores WHERE scope=? ORDER BY created_at DESC LIMIT 1000",
       )

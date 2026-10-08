@@ -62,7 +62,7 @@ try {
   run("git", ["add", "--all"], directory);
   run(
     "git",
-    ["commit", "-m", `deploy: Pages from ${sourceSha.slice(0, 7)}`],
+    ["commit", "-m", `发布穷鬼地图页面 ${sourceSha.slice(0, 7)}`],
     directory,
   );
   run("git", ["push", remote, "HEAD:refs/heads/gh-pages"], directory);

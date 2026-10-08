@@ -97,7 +97,7 @@ test("bookmarks survive reload and coarse location remains labelled", async ({
   await page.getByRole("button", { name: "我的收藏", exact: true }).click();
   await expect(page.locator(".store-card")).toHaveCount(1);
   await page.locator(".store-open").click();
-  await expect(page.locator(".detail-card")).toContainText("商圈参考位置");
+  await expect(page.locator(".detail-card")).toContainText("B1-25");
 });
 test("one sentence sharing and replies persist after reload", async ({
   page,

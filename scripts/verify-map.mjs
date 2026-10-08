@@ -46,7 +46,11 @@ try {
   );
   p.on("response", (r) => {
     const u = new URL(r.url());
-    if (/^t[0-7]\.tianditu\.gov\.cn$/.test(u.host))
+    if (
+      /^t[0-7]\.tianditu\.gov\.cn$/.test(u.host) ||
+      (/amap\.com$/.test(u.host) &&
+        (u.pathname.includes("/tile/") || u.pathname.includes("get_tile")))
+    )
       tileResponses.push({
         status: r.status(),
         type: r.headers()["content-type"],
@@ -56,16 +60,17 @@ try {
   await expect(p.getByRole("button", { name: "标记门店" })).toBeEnabled({
     timeout: 30000,
   });
-  assert.ok(
-    tileResponses.some((r) => r.status === 200 && r.type?.includes("image/")),
-  );
-  await expect(p.locator(".leaflet-control-attribution")).toContainText(
-    "天地图",
-  );
+  await expect
+    .poll(() => tileResponses.some((r) => r.status === 200), { timeout: 15000 })
+    .toBe(true);
+  await expect(p.locator(".map-source")).toContainText(/高德地图|天地图/);
+  await expect(
+    p.locator(".amap-logo, .leaflet-control-attribution").first(),
+  ).toBeVisible();
   await p.getByRole("button", { name: "标记门店" }).click();
-  const box = await p.locator(".td-map").boundingBox();
+  const box = await p.locator(".amap-container:visible, .td-map").boundingBox();
   await p
-    .locator(".td-map")
+    .locator(".amap-container:visible, .td-map")
     .click({ position: { x: box.width * 0.55, y: box.height * 0.5 } });
   await p.getByLabel("门店名称").fill("隔离真实底图选点");
   await p.getByRole("button", { name: "保存门店" }).click();

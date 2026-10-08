@@ -51,13 +51,13 @@ try {
     if (!remoteUrl) {
       // Read-only bridge for a random-port local static preview; production CORS stays narrow.
       await page.route(
-        /^https:\/\/poor-map-api\.gong7968\.workers\.dev\/api\/(water\/config|community\/stores)/,
+        /^https:\/\/poor-map-api\.gong7968\.workers\.dev\/(?:api\/(?:water\/(?:config|candidates)|community\/stores)|_AMapService\/)/,
         async (r) => {
           const upstream = await fetch(r.request().url());
           await r.fulfill({
             status: upstream.status,
             headers: {
-              "Content-Type": "application/json",
+              "Content-Type": upstream.headers.get("content-type") || "application/json",
               "Access-Control-Allow-Origin": new URL(url).origin,
             },
             body: await upstream.text(),
@@ -88,7 +88,9 @@ try {
     await expect(page.locator(".store-card")).toHaveCount(1);
     assert.equal(await page.getByLabel("价格上限").count(), 0);
     await page.getByRole("button", { name: "数据来源与配置" }).click();
-    assert.ok((await page.getByRole("dialog").innerText()).includes("天地图"));
+    assert.ok(
+      (await page.getByRole("dialog").innerText()).match(/高德|天地图/),
+    );
     await page.keyboard.press("Escape");
     await page.locator(".brand").click();
     if (name === "mobile")
@@ -108,7 +110,8 @@ try {
       apiRequests.every(
         (u) =>
           u.startsWith("https://poor-map-api.gong7968.workers.dev/") &&
-          /\/api\/(analytics|community|water)\//.test(u),
+          (/\/api\/(analytics|community|water)\//.test(u) ||
+            u.includes("/_AMapService/")),
       ),
     );
     assert.deepEqual(errors, []);

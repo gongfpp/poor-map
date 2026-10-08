@@ -1,4 +1,9 @@
-import { discoverStores, mergeStores, clearDiscoveryCache } from "./discovery";
+import {
+  discoverStores,
+  mergeStores,
+  clearDiscoveryCache,
+  discoverAmap,
+} from "./discovery";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bookmark,
@@ -97,7 +102,7 @@ export default function App() {
   }, []);
   useEffect(() => {
     const c = new AbortController();
-    fetch(`${WATER_API}/api/water/config?map=tianditu`, { signal: c.signal })
+    fetch(`${WATER_API}/api/water/config`, { signal: c.signal })
       .then((r) => {
         if (!r.ok) throw new Error();
         return r.json();
@@ -111,7 +116,10 @@ export default function App() {
   }, [refresh]);
   const stores = useMemo(() => mergeStores(live, nearby), [live, nearby]);
   useEffect(() => {
-    if (config.provider !== "tianditu" || !config.jsKey) {
+    if (
+      !config.searchReady &&
+      !(config.provider === "tianditu" && config.jsKey)
+    ) {
       setNearby([]);
       setDiscovering(false);
       setDiscoveryNote("自动检索暂不可用，仍可查看共享门店。");
@@ -122,18 +130,24 @@ export default function App() {
     setDiscovering(true);
     setDiscoveryNote("正在查找附近品牌门店…");
     track("query_start", { radius });
-    discoverStores(
-      config.jsKey,
-      center,
-      radius,
-      false,
-      c.signal,
-      fetch,
-      setNearby,
+    (config.provider === "amap"
+      ? discoverAmap(center, radius, false, c.signal)
+      : discoverStores(
+          config.jsKey,
+          center,
+          radius,
+          false,
+          c.signal,
+          fetch,
+          setNearby,
+        )
     )
       .then((d) => {
         setNearby(d.stores);
-        track("query_success", { source: "tianditu", count: d.stores.length });
+        track("query_success", {
+          source: config.provider,
+          count: d.stores.length,
+        });
         setDiscoveryNote(
           d.warnings.length
             ? `自动检索到 ${d.stores.length} 家候选。${d.warnings.join(" ")}`
@@ -143,14 +157,21 @@ export default function App() {
       .catch((e) => {
         if (e.name !== "AbortError") {
           setDiscoveryNote(e.message);
-          track("query_error", { source: "tianditu" });
+          track("query_error", { source: config.provider });
         }
       })
       .finally(() => {
         if (!c.signal.aborted) setDiscovering(false);
       });
     return () => c.abort();
-  }, [config.provider, config.jsKey, center, radius, refresh]);
+  }, [
+    config.provider,
+    config.jsKey,
+    config.searchReady,
+    center,
+    radius,
+    refresh,
+  ]);
   const visible = useMemo(
     () =>
       stores
@@ -568,9 +589,11 @@ export default function App() {
                           {distanceText(distance(center, s.location))} · 直线
                           {s.source === "tianditu"
                             ? " · 天地图"
-                            : s.source === "demo"
-                              ? " · 演示"
-                              : ""}
+                            : s.source === "amap"
+                              ? " · 高德"
+                              : s.source === "demo"
+                                ? " · 演示"
+                                : ""}
                         </span>
                       </span>
                     </button>
@@ -618,6 +641,7 @@ export default function App() {
             onSelect={select}
             demo={demo}
             provider={config.provider}
+            serviceHost={`${WATER_API || location.origin}/_AMapService`}
             jsKey={config.jsKey}
             mapReady={config.mapReady}
             onReadyChange={setTileReady}
@@ -669,9 +693,11 @@ export default function App() {
                   ·{" "}
                   {current.source === "tianditu"
                     ? "天地图候选 · 营业状态待确认"
-                    : current.source === "demo"
-                      ? "演示门店"
-                      : "用户标记 · 未核验"}
+                    : current.source === "amap"
+                      ? "高德候选 · 营业状态待确认"
+                      : current.source === "demo"
+                        ? "演示门店"
+                        : "用户标记 · 未核验"}
                 </span>
                 <button
                   className="icon-button"
@@ -856,11 +882,13 @@ export default function App() {
       {modal === "config" && (
         <Modal title="数据从哪里来？" onClose={() => open(null)}>
           <p className="modal-copy">
-            底图和候选门店来自天地图，社区补充门店、评论和水价。搜索每品牌最多取首批20家，地图收录可能不全，不能证明营业状态、商品价格或库存。
+            底图和候选门店来自当前地图服务，社区补充门店、评论和水价。高德每分类首批25家，天地图每品牌首批20家，地图收录可能不全，不能证明营业状态、商品价格或库存。
             收藏保存在当前浏览器；评论公开保存并允许回复纠错，均为未核验线索。
           </p>
           <div className="provider-row">
-            <span>天地图道路底图</span>
+            <span>
+              {config.provider === "amap" ? "高德道路底图" : "天地图道路底图"}
+            </span>
             <b>{config.mapReady ? "已配置" : "暂不可用"}</b>
           </div>
           {!config.mapReady && (
@@ -874,9 +902,11 @@ export default function App() {
           <div className="provider-row">
             <span>附近品牌门店检索</span>
             <b>
-              {config.provider === "tianditu" && config.jsKey
-                ? "天地图 · 已配置"
-                : "暂不可用"}
+              {config.searchReady
+                ? "高德 · 个人研究学习"
+                : config.provider === "tianditu" && config.jsKey
+                  ? "天地图 · 已配置"
+                  : "暂不可用"}
             </b>
           </div>
           <div className="provider-row">
@@ -884,7 +914,7 @@ export default function App() {
             <b>未接入</b>
           </div>
           <p className="form-hint">
-            门店参考位置来自地图接口或用户标记，价格线索由用户提供，欢迎回复补充和纠错。商圈参考位置不能等同于准确铺位。查询中心取约100米精度发往天地图，不保存到店库、收藏ID或埋点。
+            门店参考位置来自地图接口或用户标记，价格线索由用户提供，欢迎回复补充和纠错。商圈参考位置不能等同于准确铺位。查询中心取约100米精度用于门店接口检索，不保存到店库、收藏ID或埋点。
           </p>
           <div className="privacy-control">
             <h3>使用统计</h3>

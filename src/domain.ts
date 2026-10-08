@@ -12,6 +12,7 @@ export type Store = {
   price?: number;
   priceNote?: string;
   source: "demo" | "amap" | "community" | "tianditu";
+  amapId?: string;
 };
 export type Deal = {
   id: string;

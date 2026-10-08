@@ -72,6 +72,8 @@ function LegacyMapView({
   mapReady,
   onLocate,
   onMove,
+  onPickLocation,
+  onReadyChange,
   eventIds,
   canLocate = true,
   radiusMeters = 3000,
@@ -82,12 +84,15 @@ function LegacyMapView({
   const host = useRef<HTMLDivElement>(null),
     map = useRef<any>(null),
     markers = useRef<any[]>([]),
-    callbacks = useRef({ onSelect, onMove });
+    callbacks = useRef({ onSelect, onMove, onPickLocation, onReadyChange });
   const [mapState, setMapState] = useState(""),
     [zoom, setZoom] = useState(1),
     [retry, setRetry] = useState(0),
     [ready, setReady] = useState(false);
-  callbacks.current = { onSelect, onMove };
+  callbacks.current = { onSelect, onMove, onPickLocation, onReadyChange };
+  useEffect(() => {
+    callbacks.current.onReadyChange?.(ready);
+  }, [ready]);
   const latestCenter = useRef(center);
   latestCenter.current = center;
   useEffect(() => {
@@ -110,6 +115,13 @@ function LegacyMapView({
         map.current.on("dragend", () => {
           const c = map.current?.getCenter();
           if (c) callbacks.current.onMove([c.lng, c.lat]);
+        });
+        map.current.on("click", (e: any) => {
+          if (callbacks.current.onPickLocation && e.lnglat)
+            callbacks.current.onPickLocation([
+              e.lnglat.getLng(),
+              e.lnglat.getLat(),
+            ]);
         });
         readyTimer = setTimeout(() => {
           if (!cancelled)
@@ -180,13 +192,41 @@ function LegacyMapView({
       if (map.current) map.current.remove(markers.current);
     };
   }, [stores, selected, ready, eventIds, waterMode, markerLabels]);
+  useEffect(() => {
+    const store = stores.find((s) => s.id === selected);
+    if (ready && store) map.current?.panTo?.(store.location);
+  }, [selected, ready]);
+  useEffect(() => {
+    if (!ready || !map.current) return;
+    const ring = new window.AMap.Circle({
+      bubble: true,
+      center,
+      radius: radiusMeters,
+      strokeColor: "#7b68bb",
+      strokeOpacity: 0.35,
+      strokeWeight: 1,
+      strokeStyle: "dashed",
+      fillOpacity: 0.015,
+    });
+    const point = new window.AMap.Circle({
+      bubble: true,
+      center,
+      radius: 12,
+      strokeColor: "#fff",
+      strokeWeight: 2,
+      fillColor: "#7152c8",
+      fillOpacity: 1,
+    });
+    map.current.add([ring, point]);
+    return () => map.current?.remove([ring, point]);
+  }, [center, radiusMeters, ready]);
   function changeZoom(delta: number) {
     track("map_zoom", { action: delta > 0 ? "zoom_in" : "zoom_out" });
     if (map.current) map.current.setZoom(map.current.getZoom() + delta);
     else setZoom((z) => Math.min(1.8, Math.max(0.65, z + delta * 0.2)));
   }
   return (
-    <div className="map-canvas">
+    <div className="map-canvas amap-canvas">
       <div
         ref={host}
         className="amap-container"

@@ -5,6 +5,28 @@ import {
   type Store,
   type Category,
 } from "./domain";
+import { WATER_API } from "./config";
+export async function discoverAmap(
+  center: [number, number],
+  radius: number,
+  water = false,
+  signal?: AbortSignal,
+) {
+  const anchor = center.map((n) => Number(n.toFixed(3))).join(",");
+  const r = await fetch(
+    `${WATER_API}/api/water/candidates?mode=${water ? "water" : "home"}&center=${anchor}&radius=${radius}`,
+    { signal },
+  );
+  const d = await r.json();
+  if (!r.ok || !d.configured)
+    throw new Error(d.error || "高德附近门店检索尚未配置。");
+  return {
+    stores: d.stores.filter(
+      (s: Store) => distance(center, s.location) <= radius,
+    ) as Store[],
+    warnings: d.warnings || [],
+  };
+}
 const brands: [Category, string][] = [
   ["mixue", "蜜雪冰城"],
   ["discount", "赵一鸣"],
@@ -209,7 +231,7 @@ export async function discoverStores(
 export function mergeStores(community: Store[], candidates: Store[]): Store[] {
   const result = [...community];
   for (const s of candidates) {
-    if (result.some((x) => x.id === s.id)) continue;
+    if (result.some((x) => x.id === s.id || x.amapId === s.id)) continue;
     // Preserve the community identity and its user-selected position; never migrate prices/comments on a fuzzy brand match.
     const same = result.some(
       (x) =>

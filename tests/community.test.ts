@@ -229,7 +229,7 @@ test("store markers require an explicit valid location and remain isolated", asy
     ).json();
     assert.equal(publicBefore.stores.length, 1);
     assert.ok(publicBefore.stores.every((s: any) => s.source !== "demo"));
-    assert.equal(publicBefore.stores[0].locationPrecision, "area");
+    assert.equal(publicBefore.stores[0].locationPrecision, "poi");
     const input = {
       name: "测试蜜雪冰城",
       category: "mixue",

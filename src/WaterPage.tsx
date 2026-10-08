@@ -1,4 +1,4 @@
-import { discoverStores } from "./discovery";
+import { discoverStores, discoverAmap } from "./discovery";
 import { track } from "./telemetry";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -35,6 +35,7 @@ import {
   type WaterFilters,
 } from "./water-domain";
 import { currentLocation } from "./location";
+import { seedStores } from "./store-domain";
 import { WATER_API } from "./config";
 import Modal from "./Modal";
 import MapView from "./MapView";
@@ -131,9 +132,14 @@ export default function WaterPage() {
           category: "discount",
           tags: ["社区水价"],
           source: "community",
+          amapId: seedStores.find((s) => s.id === o.storeId)?.amapId,
         });
     for (const s of candidates)
-      if (distance(center, s.location) <= filters.radius && !entries.has(s.id))
+      if (
+        distance(center, s.location) <= filters.radius &&
+        !entries.has(s.id) &&
+        ![...entries.values()].some((x) => x.amapId === s.id)
+      )
         entries.set(s.id, s);
     return [...entries.values()];
   }, [visible, candidates, center, filters.radius]);
@@ -200,7 +206,7 @@ export default function WaterPage() {
   }, [refresh]);
   useEffect(() => {
     const controller = new AbortController();
-    api("/config?map=tianditu", { signal: controller.signal })
+    api("/config", { signal: controller.signal })
       .then((data) => {
         setConfig(data);
         if (!data.searchReady && !(data.provider === "tianditu" && data.jsKey))
@@ -241,9 +247,7 @@ export default function WaterPage() {
           fetch,
           setCandidates,
         )
-      : api(`/candidates?center=${center.join(",")}&radius=${filters.radius}`, {
-          signal: controller.signal,
-        })
+      : discoverAmap(center, filters.radius, true, controller.signal)
     )
       .then((data) => {
         track("query_success", {
@@ -315,9 +319,12 @@ export default function WaterPage() {
     setModal("edit");
   }
   function chooseStore(id: string) {
-    const offer = visible.find((o) => o.storeId === id);
+    const offer = linkedOffer(id);
     if (offer) {
-      setSelected(offer.id);
+      if (visible.some((o) => o.id === offer.id)) {
+        setSelected(offer.id);
+        setMapOnly(true);
+      } else edit(offer);
     } else {
       const s = candidates.find((s) => s.id === id);
       if (s)
@@ -341,6 +348,13 @@ export default function WaterPage() {
           status: "unknown",
         });
     }
+  }
+  function linkedOffer(id: string) {
+    return offers.find(
+      (o) =>
+        o.storeId === id ||
+        seedStores.find((s) => s.id === o.storeId)?.amapId === id,
+    );
   }
   const update = (patch: Partial<WaterFilters>) => {
     track("water_filter", {
@@ -707,11 +721,17 @@ export default function WaterPage() {
                     <strong>{s.name}</strong>
                     <small>
                       {distanceText(distance(center, s.location))} ·
-                      {s.source === "tianditu" ? " 天地图 ·" : ""} 价格尚未收录
+                      {s.source === "tianditu"
+                        ? " 天地图 ·"
+                        : s.source === "amap"
+                          ? " 高德 ·"
+                          : ""}{" "}
+                      {linkedOffer(s.id) ? "已有社区水价" : "价格尚未收录"}
                     </small>
                   </span>
                   <button disabled={!ready} onClick={() => chooseStore(s.id)}>
-                    补水价 <Plus size={12} />
+                    {linkedOffer(s.id) ? "查看水价" : "补水价"}{" "}
+                    <Plus size={12} />
                   </button>
                 </div>
               ))}
