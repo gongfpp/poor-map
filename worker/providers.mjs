@@ -1,5 +1,6 @@
 import { gcj02ToWgs84, wgs84ToGcj02, distance } from "../src/domain.ts";
 import { validateArea } from "./place-cache.mjs";
+import { signBaiduUrl } from "./baidu-sign.mjs";
 const names = ["赵一鸣", "零食很忙", "零食有鸣", "好特卖", "嗨特购", "奥特乐"];
 export const providerNames = {
   amap: "高德",
@@ -7,6 +8,7 @@ export const providerNames = {
   baidu: "百度",
   tianditu: "天地图",
 };
+export class DiscoveryError extends Error {}
 export function providerConfigured(env, provider) {
   return !!{
     amap: env.AMAP_WEB_SERVICE_KEY,
@@ -16,9 +18,30 @@ export function providerConfigured(env, provider) {
   }[provider];
 }
 async function jsonRequest(url, fetcher) {
-  const r = await fetcher(url, { signal: AbortSignal.timeout(12000) });
-  if (!r.ok) throw Error("请求失败（" + r.status + "）");
-  return r.json();
+  let r;
+  try {
+    r = await fetcher.call(globalThis, url, {
+      signal: AbortSignal.timeout(12000),
+      redirect: "manual",
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "PoorMap/0.2 personal-research",
+      },
+    });
+  } catch {
+    throw new DiscoveryError("地图服务网络请求失败或超时。");
+  }
+  if (!r.ok) throw new DiscoveryError("请求失败（" + r.status + "）");
+  const text = await r.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new DiscoveryError(
+      /安全验证|验证码|captcha/i.test(text)
+        ? "地图服务返回安全验证页，云端请求暂不可用。"
+        : "地图服务响应格式无效。",
+    );
+  }
 }
 export async function backupDiscovery(
   provider,
@@ -83,8 +106,19 @@ export async function backupDiscovery(
           scope: 1,
         }))
           u.searchParams.set(k, String(v));
+        try {
+          await signBaiduUrl(u, env);
+        } catch {
+          throw new DiscoveryError("百度请求签名失败。");
+        }
         const d = await jsonRequest(u, fetcher);
-        if (d.status !== 0) throw Error("百度查询失败（" + d.status + "）");
+        if (d.status !== 0)
+          throw new DiscoveryError(
+            "百度查询失败" +
+              (/^\d{1,6}$/.test(String(d.status))
+                ? "（" + d.status + "）"
+                : ""),
+          );
         count = d.total;
         rows = (Array.isArray(d.results) ? d.results : [])
           .filter((p) => p && typeof p === "object")
@@ -161,11 +195,20 @@ export async function backupDiscovery(
           locationPrecision: "poi",
         });
       }
-    } catch {
-      warnings.push(providerNames[provider] + "的" + keyword + "查询未成功。");
+    } catch (e) {
+      warnings.push(
+        providerNames[provider] +
+          "的" +
+          keyword +
+          "查询未成功。" +
+          (e instanceof DiscoveryError ? e.message : ""),
+      );
       if (!ok) break;
     }
   }
-  if (!ok) throw Error(providerNames[provider] + "附近查询未成功。");
+  if (!ok)
+    throw new DiscoveryError(
+      warnings.join(" ") || providerNames[provider] + "附近查询未成功。",
+    );
   return { stores: [...stores.values()], configured: true, warnings };
 }

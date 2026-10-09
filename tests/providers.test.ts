@@ -1,6 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { backupDiscovery, providerConfigured } from "../worker/providers.mjs";
+test("non-JSON backup responses fail explicitly without leaking upstream page content", async () => {
+  await assert.rejects(
+    backupDiscovery(
+      "baidu",
+      [121.55, 29.87],
+      3000,
+      "home",
+      { BAIDU_WEB_SERVICE_KEY: "private-ak" },
+      async () =>
+        new Response("<html>验证码 private-ak</html>", {
+          headers: { "content-type": "text/html" },
+        }),
+    ),
+    (e: Error) =>
+      e.message.includes("安全验证") &&
+      !e.message.includes("private-ak") &&
+      !e.message.includes("<html>"),
+  );
+});
 import { gcj02ToWgs84, distance } from "../src/domain";
 
 const center: [number, number] = [121.553, 29.871];

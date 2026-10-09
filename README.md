@@ -82,11 +82,14 @@ npm run verify:community -- https://gongfpp.github.io/poor-map/
 npm run verify:map -- https://gongfpp.github.io/poor-map/
 npm run verify:discovery -- https://gongfpp.github.io/poor-map/
 npm run verify:navigation -- https://gongfpp.github.io/poor-map/
+npm run verify:backups
 ```
 
 Pages禁止请求本地API；门店、共享评论、便宜水和埋点请求独立HTTPS Worker。高德SDK及道路瓦片从官方域名加载，保留SDK自带版权标注；安全码经Worker代理附加。天地图备选按需加载官方瓦片。地图安全密钥、Web服务Key、QA和统计凭据均不进入构建。部署后核对deploy-meta.json的源码SHA并实测桌面与手机。
 
 共享验收使用私密QA Token和隔离数据集，结束清理，不改公开线索。浏览器测试的适配返回是测试数据，不能证明真实地图。手机Chrome模拟不等于物理iPhone/Safari，大陆网络可达性尚未现场验收。
+
+百度备用服务端凭据已配置SN签名，本地真实搜店和步行失败切换已通过，Cloudflare真实检索仍返回不可解析响应，尚不能称为在线可用的备用。腾讯按用户要求暂缓；天地图服务端Key仍待验证码授权。详见[备用接入状态](docs/CACHE.md)。
 
 美团、大众点评、抖音没有获批的全城活动接口，当前未接入。没有账号系统、自动审核或实时库存。数据来源见 [DATA_SOURCES.md](docs/DATA_SOURCES.md)，公开范围与第三方许可见 [PUBLIC_NOTICE.md](PUBLIC_NOTICE.md)。
 

@@ -1,4 +1,5 @@
 import { distance } from "../src/domain.ts";
+import { signBaiduUrl } from "./baidu-sign.mjs";
 import {
   eligibleNavigationStore,
   validNavigationPoint,
@@ -88,6 +89,7 @@ async function requestRoute(
   key,
   fetcher,
   signal,
+  env,
 ) {
   const lnglat = (p) => p.map((n) => Number(n.toFixed(6))).join(",");
   const latlng = (p) => lnglat([p[1], p[0]]);
@@ -122,6 +124,9 @@ async function requestRoute(
       ret_coordtype: "gcj02",
       steps_info: "1",
     });
+    if (env.BAIDU_WEB_SERVICE_SK)
+      url.searchParams.set("timestamp", String(Math.floor(Date.now() / 1000)));
+    await signBaiduUrl(url, env);
   }
   const controller = new AbortController();
   const abort = () => controller.abort();
@@ -210,6 +215,7 @@ export async function planNearest(origin, candidates, env, fetcher = fetch) {
               key,
               fetcher,
               timeout,
+              env,
             );
             successes.push({ ...route, destination });
             if (i > 0) fallback = true;

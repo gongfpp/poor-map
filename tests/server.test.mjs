@@ -5,6 +5,8 @@ const env = {
   AMAP_JS_KEY: "public-js-key",
   AMAP_JS_SECURITY_CODE: "private-security",
   AMAP_WEB_SERVICE_KEY: "private-web-key",
+  BAIDU_WEB_SERVICE_KEY: "private-baidu-ak",
+  BAIDU_WEB_SERVICE_SK: "private-baidu-sk",
 };
 async function serve(options, run) {
   const server = createApp(options).listen(0, "127.0.0.1");
@@ -26,6 +28,9 @@ test("configuration never returns server-only credentials", async () =>
     assert.ok(text.includes("public-js-key"));
     assert.ok(!text.includes("private-security"));
     assert.ok(!text.includes("private-web-key"));
+    const config = await (await fetch(base + "/api/water/config")).text();
+    assert.ok(!config.includes("private-baidu-ak"));
+    assert.ok(!config.includes("private-baidu-sk"));
   }));
 test("missing credential fails explicitly instead of inventing POIs", async () =>
   serve({ env: {} }, async (base) => {

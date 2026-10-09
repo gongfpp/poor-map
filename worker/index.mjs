@@ -12,6 +12,7 @@ import {
   backupDiscovery,
   providerConfigured,
   providerNames,
+  DiscoveryError,
 } from "./providers.mjs";
 import { planNearest, NavigationError } from "./navigation.mjs";
 import { correctWaterPoint } from "./reference-migration.mjs";
@@ -279,8 +280,12 @@ export async function route(req, env) {
           result = d;
           provider = id;
           break;
-        } catch {
-          attempts.push(providerNames[id] + "刷新未成功。");
+        } catch (e) {
+          attempts.push(
+            e instanceof DiscoveryError
+              ? e.message
+              : providerNames[id] + "刷新未成功。",
+          );
         }
       }
       if (!result)
@@ -585,7 +590,7 @@ export default {
         );
         for (const [name, value] of Object.entries(env))
           if (
-            /KEY|TOKEN|CODE/.test(name) &&
+            /KEY|TOKEN|CODE|(?:^|_)SK$/.test(name) &&
             typeof value === "string" &&
             value.length >= 8
           )

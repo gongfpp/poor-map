@@ -1,7 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import waterWorker from "../worker/index.mjs";
 import { getWaterDB } from "./water-db.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -86,6 +86,7 @@ export function createApp({ env = process.env, upstream = fetch } = {}) {
           DB: getWaterDB(),
           QA_TOKEN: env.QA_TOKEN || waterGuard,
           STORAGE_KIND: "SQLite",
+          BAIDU_MD5: (bytes) => createHash("md5").update(bytes).digest(),
         });
         response.headers.forEach((v, k) => res.set(k, v));
         res
