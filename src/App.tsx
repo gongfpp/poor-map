@@ -1,3 +1,4 @@
+import { useWriteResume } from "./useWriteResume";
 import { preferredMap, rememberMap } from "./map-preference";
 import { NavigationPanel } from "./NavigationPanel";
 import type { NavigationResult } from "./navigation-domain";
@@ -52,6 +53,7 @@ export default function App() {
       mapReady: false,
       searchReady: false,
       writeReady: true,
+      writePausedUntil: null as string | null,
       providers: [] as { id: string; name: string; configured: boolean }[],
     }),
     [tileReady, setTileReady] = useState(false),
@@ -89,6 +91,7 @@ export default function App() {
     [sharingStore, setSharingStore] = useState(""),
     [analytics, setAnalytics] = useState(analyticsEnabled);
   const [mapChoice, setMapChoice] = useState(preferredMap);
+  useWriteResume(config.writePausedUntil, mapChoice, setConfig);
   const [citySearch, setCitySearch] = useState("");
   const [cityCounts, setCityCounts] = useState<Record<string, number>>({});
   const [cityStatsStatus, setCityStatsStatus] = useState("loading");

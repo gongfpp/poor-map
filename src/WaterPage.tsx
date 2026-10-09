@@ -1,3 +1,4 @@
+import { useWriteResume } from "./useWriteResume";
 import { preferredMap, rememberMap } from "./map-preference";
 import { storeSourceName } from "./domain";
 import { discoverStores, discoverAmap, cacheDescription } from "./discovery";
@@ -105,6 +106,7 @@ export default function WaterPage() {
       mapReady: false,
       searchReady: false,
       writeReady: true,
+      writePausedUntil: null as string | null,
     }),
     [candidates, setCandidates] = useState<Store[]>([]),
     [candidateNote, setCandidateNote] = useState("正在检查周边门店服务…");
@@ -116,6 +118,7 @@ export default function WaterPage() {
     [mapOnly, setMapOnly] = useState(() => window.innerWidth < 800),
     [draftCenter, setDraftCenter] = useState<[number, number] | null>(null),
     [locating, setLocating] = useState(false);
+  useWriteResume(config.writePausedUntil, mapChoice, setConfig);
   const chosen = useRef(false);
   const visible = useMemo(
     () => waterResults(offers, center, filters),
