@@ -122,6 +122,10 @@
 .water-map-wrap .pin {
   min-width: 67px;
   width: auto;
+  max-width: 188px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
   height: 30px;
   padding: 0 8px;
   border-width: 2px;

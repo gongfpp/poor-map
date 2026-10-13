@@ -169,6 +169,9 @@ test("water candidates never gain a price or enter the liter ranking", async ({
   if (await button.isVisible()) await button.click();
   await page.locator(".water-candidates summary").click();
   await expect(page.locator(".water-candidates")).toContainText("测试超市");
+  await expect(
+    page.getByRole("button", { name: "查看 测试超市", exact: true }),
+  ).toContainText("测试超市");
   await expect(page.locator(".water-candidates")).toContainText("价格尚未收录");
   await expect(page.locator(".water-results .water-offer")).toHaveCount(2);
   await expect(page.locator(".water-results")).not.toContainText("测试超市");

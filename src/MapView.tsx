@@ -185,9 +185,7 @@ function LegacyMapView({
         ? String(group.stores.length)
         : markerLabels?.[s.id] ||
           (waterMode
-            ? s.source === "community"
-              ? "水"
-              : "店"
+            ? s.name
             : eventIds.has(s.id)
               ? "免"
               : categories.find((c) => c.id === s.category)!.short);
@@ -455,9 +453,7 @@ function LegacyMapView({
                 >
                   {markerLabels?.[s.id] ||
                     (waterMode
-                      ? s.source === "community"
-                        ? "水"
-                        : "店"
+                      ? s.name
                       : eventIds.has(s.id)
                         ? "免"
                         : categories.find((c) => c.id === s.category)!.short)}

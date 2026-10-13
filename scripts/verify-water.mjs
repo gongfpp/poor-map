@@ -89,7 +89,7 @@ try {
     .filter({ hasText: "K11" })
     .getByRole("button", { name: "编辑 / 补信息" })
     .click();
-  await writer.getByLabel("整份价格（元）").fill("9.9");
+  await writer.getByLabel("价格（元）").fill("9.9");
   await writer.getByRole("button", { name: "保存共享线索" }).click();
   await writer.getByRole("dialog").waitFor({ state: "hidden" });
   const reader = await second.newPage();
@@ -110,7 +110,7 @@ try {
     .filter({ hasText: "K11" })
     .getByRole("button", { name: "反馈", exact: true })
     .click();
-  await reader.getByLabel("补充说明").fill("隔离 QA 验证，不写入公开线索。");
+  await reader.getByLabel("备注").fill("隔离 QA 验证，不写入公开线索。");
   await reader.getByRole("button", { name: "公开保存反馈" }).click();
   await reader.getByRole("dialog").waitFor({ state: "hidden" });
   await reader.getByLabel("只看用户反馈有货").check();

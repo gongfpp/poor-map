@@ -383,7 +383,7 @@ export default function App() {
             <span>标记门店</span>
           </button>
           <a className="water-nav" href="#/water" data-track="water">
-            便宜水
+            大水地图
           </a>
           <button
             className="header-link"

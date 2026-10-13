@@ -7,6 +7,7 @@ import {
   perLiterHigh,
   validateWater,
   waterResults,
+  simpleWaterInput,
   type WaterFilters,
 } from "../src/water-domain.ts";
 import worker from "../worker/index.mjs";
@@ -19,6 +20,60 @@ const defaults: WaterFilters = {
   channel: "all",
   query: "",
 };
+test("simple water submissions allow unknown location and specs without inventing a per-liter price", () => {
+  const input = simpleWaterInput("某超市", 1.2, "1.5L 的水，货架看到的", null);
+  assert.equal(validateWater(input), null);
+  assert.equal(input.location, null);
+  assert.equal(input.bottles, null);
+  assert.equal(input.volumeMl, null);
+  assert.equal(perLiter(input as any), null);
+  assert.equal(validateWater(simpleWaterInput("某超市", 0.9, "", null)), null);
+});
+test("simple edits preserve confirmed specifications but clear stale price ranges and renamed-store locations", () => {
+  const original = seedWater[0];
+  const edited = simpleWaterInput(
+    original.storeName,
+    9.9,
+    "今日参考价格",
+    original,
+  );
+  assert.equal(edited.volumeMl, 550);
+  assert.equal(edited.bottles, 24);
+  assert.deepEqual(edited.location, original.location);
+  const changed = simpleWaterInput(
+    seedWater[1].storeName,
+    1.5,
+    "新价格",
+    seedWater[1],
+  );
+  assert.equal(changed.priceHigh, null);
+  const renamed = simpleWaterInput("另一家超市", 1.2, "", original);
+  assert.equal(renamed.location, null);
+  assert.equal(renamed.volumeMl, null);
+});
+test("simple submissions match only one exact known shop name, never a fuzzy brand or ambiguous branch", () => {
+  const store: any = {
+    id: "B123",
+    name: "好特卖（某广场店）",
+    address: "公开门店地址",
+    location: [121.55, 29.87],
+    locationPrecision: "poi",
+  };
+  const exact = simpleWaterInput(store.name, 1.2, "", null, [store]);
+  assert.equal(exact.storeId, store.id);
+  assert.deepEqual(exact.location, store.location);
+  assert.equal(
+    simpleWaterInput("好特卖", 1.2, "", null, [store]).location,
+    null,
+  );
+  assert.equal(
+    simpleWaterInput(store.name, 1.2, "", null, [
+      store,
+      { ...store, id: "B456" },
+    ]).location,
+    null,
+  );
+});
 test("8.9 for 24x550ml equals 13.2L and about 0.6742 yuan per liter", () =>
   assert.ok(Math.abs(perLiter(seedWater[0])! - 8.9 / 13.2) < 1e-10));
 test("unknown bottle size does not become a per-liter bargain", () => {

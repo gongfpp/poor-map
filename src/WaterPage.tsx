@@ -33,6 +33,7 @@ import {
   waterResults,
   waterStatus,
   validateWater,
+  simpleWaterInput,
   type WaterOffer,
   type WaterInput,
   type WaterFilters,
@@ -65,7 +66,7 @@ const channelText = {
   offline: "线下货架",
   meituan: "美团团购",
   douyin: "抖音团购",
-  other: "团购 / 其他来源",
+  other: "其他 / 待确认",
 };
 const statusText = {
   unknown: "当前价格与库存待确认",
@@ -151,25 +152,11 @@ export default function WaterPage() {
     return [...entries.values()];
   }, [visible, candidates, center, filters.radius]);
   const markerLabels = useMemo(
-    () =>
-      Object.fromEntries(
-        mapStores
-          .filter((s) => s.source === "community")
-          .map((s) => {
-            const units = visible
-              .filter((o) => o.storeId === s.id && usableOffer(o))
-              .map((o) => perLiterHigh(o))
-              .filter((n): n is number => n !== null);
-            return [
-              s.id,
-              units.length ? `¥${fmt(Math.min(...units))}/L` : "待补充",
-            ];
-          }),
-      ),
-    [mapStores, visible],
+    () => Object.fromEntries(mapStores.map((s) => [s.id, s.name])),
+    [mapStores],
   );
   useEffect(() => {
-    document.title = "便宜水 · 穷鬼地图";
+    document.title = "大水地图 · 穷鬼地图";
     return () => {
       document.title = "穷鬼地图 · 把钱花在刀刃上";
     };
@@ -307,7 +294,7 @@ export default function WaterPage() {
           product: "饮用水",
           waterType: "unknown",
           volumeMl: null,
-          bottles: 1,
+          bottles: null,
           price: 0,
           priceHigh: null,
           channel: "offline",
@@ -340,7 +327,7 @@ export default function WaterPage() {
   return (
     <div className="water-app">
       <header className="water-header">
-        <h1 className="sr-only">便宜水</h1>
+        <h1 className="sr-only">大水地图</h1>
         <a className="water-brand" href={import.meta.env.BASE_URL}>
           <span className="brand-icon">
             <Wallet size={21} />
@@ -354,7 +341,7 @@ export default function WaterPage() {
           </a>
           <span className="water-nav active">
             <Droplets size={16} />
-            便宜水
+            大水地图
           </span>
         </nav>
         <button
@@ -369,7 +356,7 @@ export default function WaterPage() {
       <main className="water-main">
         <aside
           className={`water-sidebar ${mapOnly ? "water-sidebar-closed" : ""}`}
-          aria-label="便宜水筛选与结果"
+          aria-label="大水地图筛选与结果"
         >
           <div className="water-location">
             <MapPin size={17} />
@@ -433,7 +420,7 @@ export default function WaterPage() {
             <label className="water-select">
               范围
               <select
-                aria-label="便宜水搜索半径"
+                aria-label="大水地图搜索半径"
                 value={filters.radius}
                 onChange={(e) => update({ radius: Number(e.target.value) })}
               >
@@ -600,7 +587,7 @@ export default function WaterPage() {
                           {o.priceHigh !== null && `–${fmt(o.priceHigh)}`}
                         </b>
                         <span>
-                          {o.bottles > 1
+                          {(o.bottles ?? 0) > 1
                             ? `整箱 ${o.bottles} 瓶`
                             : "单份参考价"}
                         </span>
@@ -608,12 +595,12 @@ export default function WaterPage() {
                     </div>
                     <div className="water-tags">
                       <span>
-                        {o.volumeMl
+                        {o.volumeMl && o.bottles
                           ? `${fmt(o.volumeMl / 1000)}L × ${o.bottles}瓶`
                           : "规格未知"}
                       </span>
                       <span>{channelText[o.channel]}</span>
-                      {liters(o) && o.bottles > 1 && (
+                      {liters(o) && (o.bottles ?? 0) > 1 && (
                         <span>一次购买 {fmt(liters(o)!)}L</span>
                       )}
                       <span className="water-status">
@@ -683,7 +670,7 @@ export default function WaterPage() {
               ) && (
                 <div className="water-unlocated">
                   <h3>尚未定位的社区线索</h3>
-                  <p>以下地址还未确认坐标，不计入“附近”和距离排名。</p>
+                  <p>这些门店尚未确认位置，不计入附近和距离排名。</p>
                   {offers
                     .filter(
                       (o) =>
@@ -692,7 +679,7 @@ export default function WaterPage() {
                     )
                     .map((o) => (
                       <button key={o.id} onClick={() => edit(o)}>
-                        {o.storeName} · {o.address}
+                        {o.storeName} · ¥{fmt(o.price)}
                         <Pencil size={13} />
                       </button>
                     ))}
@@ -702,7 +689,7 @@ export default function WaterPage() {
             <details className="water-candidates">
               <summary>
                 <ShoppingBag size={16} />
-                可能有便宜水的店 <b>{candidates.length}</b>
+                附近超市 <b>{candidates.length}</b>
               </summary>
               <p>
                 {candidateNote}{" "}
@@ -861,12 +848,12 @@ export default function WaterPage() {
       )}
       {modal === "edit" && (
         <Modal
-          title={editing && "id" in editing ? "编辑水价线索" : "补充一条便宜水"}
+          title={editing && "id" in editing ? "编辑水价线索" : "补充一条水价"}
           onClose={() => setModal(null)}
         >
           <WaterEditor
             initial={editing}
-            config={config}
+            stores={mapStores}
             onSave={async (input) => {
               track("water_submit", { action: "submit" });
               const existing = editing && "id" in editing ? editing : null;
@@ -920,75 +907,32 @@ export default function WaterPage() {
 }
 function WaterEditor({
   initial,
-  config,
+  stores,
   onSave,
 }: {
   initial: WaterOffer | WaterInput | null;
-  config: { searchReady: boolean };
+  stores: Store[];
   onSave: (input: WaterInput) => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [name, setName] = useState(initial?.storeName || ""),
-    [address, setAddress] = useState(initial?.address || ""),
-    [point, setPoint] = useState(initial?.location || null),
-    [geocoding, setGeocoding] = useState(false);
-  const [precision, setPrecision] = useState<WaterInput["locationPrecision"]>(
-    initial?.locationPrecision || "unknown",
-  );
-  const [manualLng, setManualLng] = useState(
-    initial?.location?.[0].toString() || "",
-  );
-  const [manualLat, setManualLat] = useState(
-    initial?.location?.[1].toString() || "",
-  );
-  async function geocode() {
-    setGeocoding(true);
-    setError("");
-    try {
-      const d = await api(`/geocode?query=${encodeURIComponent(address)}`);
-      setPoint(d.location);
-      setPrecision(d.precision || "area");
-      setManualLng(d.location[0].toString());
-      setManualLat(d.location[1].toString());
-      setAddress(d.address);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setGeocoding(false);
-    }
-  }
+    [error, setError] = useState("");
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget),
-      expires = String(f.get("expires") || ""),
-      ml = String(f.get("volume") || ""),
-      hi = String(f.get("high") || "");
-    const input: WaterInput = {
-      storeId: initial?.storeId || crypto.randomUUID(),
-      storeName: name.trim(),
-      address: address.trim(),
-      location: point,
-      locationPrecision: point ? precision : "unknown",
-      product: String(f.get("product")).trim(),
-      waterType: String(f.get("type")) as WaterInput["waterType"],
-      volumeMl: ml ? Number(ml) : null,
-      bottles: Number(f.get("bottles")),
-      price: Number(f.get("price")),
-      priceHigh: hi ? Number(hi) : null,
-      channel: String(f.get("channel")) as WaterInput["channel"],
-      sourceUrl: String(f.get("url") || "").trim(),
-      requirements: String(f.get("requirements")).trim(),
-      observedOn: String(f.get("observed") || ""),
-      validUntil: expires ? new Date(expires).toISOString() : "",
-      status: String(f.get("status")) as WaterInput["status"],
-    };
+    const f = new FormData(e.currentTarget);
+    const input = simpleWaterInput(
+      String(f.get("storeName") || ""),
+      Number(f.get("price")),
+      String(f.get("notes") || ""),
+      initial,
+      stores,
+    );
     const issue = validateWater(input);
     if (issue) {
       setError(issue);
       return;
     }
     setBusy(true);
+    setError("");
     try {
       await onSave(input);
     } catch (e) {
@@ -1000,229 +944,50 @@ function WaterEditor({
   return (
     <form className="report-form water-editor" onSubmit={submit}>
       <p className="modal-copy">
-        内容会公开保存到社区线索库，并保留修改记录。请填写门店信息与实际看到的水价，容量、见价日期或优惠有效期不知道时可以留空。
+        写下门店和看到的价格即可。容量、瓶数、购买条件都可以写在备注里，线索会公开分享。
       </p>
       <label>
         门店名称
         <input
+          name="storeName"
           required
           maxLength={100}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          defaultValue={initial?.storeName || ""}
+          list="water-store-names"
+          placeholder="例如：好特卖东鼓道店"
         />
       </label>
+      <datalist id="water-store-names">
+        {[...new Set(stores.map((s) => s.name))].map((name) => (
+          <option key={name} value={name} />
+        ))}
+      </datalist>
       <label>
-        门店地址
+        价格（元）
         <input
+          name="price"
+          type="number"
           required
-          maxLength={250}
-          value={address}
-          onChange={(e) => {
-            setAddress(e.target.value);
-            setPoint(null);
-            setManualLng("");
-            setManualLat("");
-            setPrecision("unknown");
-          }}
-          placeholder="城市 + 街道 + 商场楼层 / 铺位"
-        />
-      </label>
-      <div className="water-form-position">
-        <span>
-          {point
-            ? `已定位 · ${initial?.locationPrecision === "area" ? "商圈范围" : "门店坐标"}`
-            : "位置未确认，不会计入附近排名"}
-        </span>
-        {config.searchReady && (
-          <button
-            type="button"
-            onClick={geocode}
-            disabled={geocoding || !address}
-          >
-            {geocoding ? "定位中…" : "查地址位置"}
-          </button>
-        )}
-      </div>
-      <details className="water-manual-position">
-        <summary>手动补充门店位置（可选）</summary>
-        <p>
-          填写门店在高德地图上的经纬度。请确认是门店位置，不要填写自己的家庭地址或当前位置。
-        </p>
-        <div className="form-columns">
-          <label>
-            门店经度
-            <input
-              type="number"
-              step="any"
-              value={manualLng}
-              onChange={(e) => {
-                const value = e.target.value;
-                setManualLng(value);
-                setPoint(
-                  value && manualLat
-                    ? [Number(value), Number(manualLat)]
-                    : null,
-                );
-                setPrecision("area");
-              }}
-            />
-          </label>
-          <label>
-            门店纬度
-            <input
-              type="number"
-              step="any"
-              value={manualLat}
-              onChange={(e) => {
-                const value = e.target.value;
-                setManualLat(value);
-                setPoint(
-                  value && manualLng
-                    ? [Number(manualLng), Number(value)]
-                    : null,
-                );
-                setPrecision("area");
-              }}
-            />
-          </label>
-        </div>
-      </details>
-      <label>
-        水名称 / 品牌
-        <input
-          name="product"
-          required
-          maxLength={100}
-          defaultValue={initial?.product || ""}
-          placeholder="例如：1.5L 纯净水"
+          min="0"
+          max="10000"
+          step="0.01"
+          defaultValue={initial && "id" in initial ? initial.price : ""}
+          placeholder="你看到的单瓶或整份标价"
         />
       </label>
       <label>
-        水类型
-        <select name="type" defaultValue={initial?.waterType || "unknown"}>
-          <option value="unknown">未确认水类型</option>
-          <option value="mineral">矿泉水</option>
-          <option value="purified">纯净水 / 饮用水</option>
-        </select>
-      </label>
-      <div className="form-columns">
-        <label>
-          单瓶容量（ml，未知留空）
-          <input
-            name="volume"
-            type="number"
-            min="100"
-            max="20000"
-            step="1"
-            defaultValue={initial?.volumeMl ?? ""}
-            placeholder="1500"
-          />
-        </label>
-        <label>
-          这份价格包含几瓶
-          <input
-            name="bottles"
-            type="number"
-            required
-            min="1"
-            max="200"
-            step="1"
-            defaultValue={initial?.bottles || 1}
-          />
-        </label>
-      </div>
-      <div className="form-columns">
-        <label>
-          整份价格（元）
-          <input
-            name="price"
-            type="number"
-            required
-            min="0"
-            max="10000"
-            step="0.01"
-            defaultValue={initial && "id" in initial ? initial.price : ""}
-          />
-        </label>
-        <label>
-          波动价上限（元，可留空）
-          <input
-            name="high"
-            type="number"
-            min="0"
-            max="10000"
-            step="0.01"
-            defaultValue={initial?.priceHigh ?? ""}
-          />
-        </label>
-      </div>
-      <label>
-        购买渠道
-        <select name="channel" defaultValue={initial?.channel || "offline"}>
-          {Object.entries(channelText).map(([id, label]) => (
-            <option key={id} value={id}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <div className="form-columns">
-        <label>
-          实际见价日期（可留空）
-          <input
-            name="observed"
-            type="date"
-            defaultValue={initial?.observedOn || ""}
-          />
-        </label>
-        <label>
-          活动截止（可留空）
-          <input
-            name="expires"
-            type="datetime-local"
-            defaultValue={
-              initial?.validUntil
-                ? new Date(
-                    Date.parse(initial.validUntil) -
-                      new Date().getTimezoneOffset() * 60000,
-                  )
-                    .toISOString()
-                    .slice(0, 16)
-                : ""
-            }
-          />
-        </label>
-      </div>
-      <label>
-        当前状态
-        <select name="status" defaultValue={initial?.status || "unknown"}>
-          <option value="unknown">待确认</option>
-          <option value="available">我看到有货</option>
-          <option value="sold-out">已卖完</option>
-          <option value="ended">优惠结束</option>
-        </select>
-      </label>
-      <label>
-        购买说明 / 限制
+        备注
         <textarea
-          name="requirements"
-          required
+          name="notes"
           maxLength={1500}
           rows={3}
           defaultValue={initial?.requirements || ""}
-          placeholder="整箱或单瓶、到店自提、新客、购买门槛、保质期……"
+          placeholder="例如：1.5L 单瓶 1.2 元；美团 8.9 元 24 瓶，需自提"
         />
       </label>
-      <label>
-        原始活动链接（可留空）
-        <input
-          name="url"
-          type="url"
-          maxLength={2000}
-          defaultValue={initial?.sourceUrl || ""}
-          placeholder="https://… 美团 / 抖音团购或商家链接"
-        />
-      </label>
+      <p className="water-form-position">
+        选择已收录的门店名称可关联地图位置；未匹配的门店先保存为待定位线索。规格未知的价格不参与每升排名。
+      </p>
       {error && (
         <p className="form-error" role="alert">
           {error}
@@ -1247,7 +1012,8 @@ function Feedback({
   onSave: (type: string, note: string) => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [type, setType] = useState("available");
   return (
     <form
       className="report-form"
@@ -1256,7 +1022,7 @@ function Feedback({
         const f = new FormData(e.currentTarget);
         setBusy(true);
         try {
-          await onSave(String(f.get("type")), String(f.get("note") || ""));
+          await onSave(type, String(f.get("note") || ""));
         } catch (e) {
           setError((e as Error).message);
         } finally {
@@ -1267,16 +1033,25 @@ function Feedback({
       <p className="modal-copy">
         反馈会公开展示，供其他人判断是否值得去。发现新价格或容量，可直接编辑线索；反馈不会自动把水价变成已核验。
       </p>
+      <div className="water-pack-tabs" role="group" aria-label="反馈情况">
+        {[
+          ["available", "看到有货"],
+          ["changed", "价格 / 条件变了"],
+          ["sold-out", "已卖完 / 找不到"],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={type === id ? "active" : ""}
+            aria-pressed={type === id}
+            onClick={() => setType(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <label>
-        你看到的情况
-        <select name="type">
-          <option value="available">看到有货</option>
-          <option value="changed">价格 / 条件变了</option>
-          <option value="sold-out">已卖完 / 找不到</option>
-        </select>
-      </label>
-      <label>
-        补充说明
+        备注
         <textarea
           name="note"
           maxLength={500}
@@ -1344,12 +1119,15 @@ function WaterHistory({ id }: { id: string }) {
               </strong>
               <span>{date(r.at)}</span>
               <p>
-                ¥{fmt(r.after.price)} / {r.after.bottles}瓶 ·{" "}
+                ¥{fmt(r.after.price)} / {r.after.bottles ?? "瓶数待确认"}
+                {r.after.bottles ? "瓶" : ""} ·{" "}
                 {r.after.volumeMl ? `${r.after.volumeMl}ml` : "容量未知"}
               </p>
               {r.before && (
                 <small>
-                  修改前：¥{fmt(r.before.price)} / {r.before.bottles}瓶 ·{" "}
+                  修改前：¥{fmt(r.before.price)} /{" "}
+                  {r.before.bottles ?? "瓶数待确认"}
+                  {r.before.bottles ? "瓶" : ""} ·{" "}
                   {r.before.volumeMl ? `${r.before.volumeMl}ml` : "容量未知"}
                 </small>
               )}

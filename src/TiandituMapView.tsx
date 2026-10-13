@@ -186,8 +186,7 @@ export default function TiandituMapView({
       );
       button.textContent = clustered
         ? String(entry.stores.length)
-        : markerLabels?.[s.id] ||
-          (waterMode ? (s.source === "community" ? "水" : "店") : cat.short);
+        : markerLabels?.[s.id] || (waterMode ? s.name : cat.short);
       button.title = clustered
         ? `${entry.stores.length}家参考门店，点击展开`
         : s.name;

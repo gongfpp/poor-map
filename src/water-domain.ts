@@ -1,4 +1,4 @@
-import { distance } from "./domain.ts";
+import { distance, type Store } from "./domain.ts";
 export type WaterOffer = {
   id: string;
   storeId: string;
@@ -9,7 +9,7 @@ export type WaterOffer = {
   product: string;
   waterType: "mineral" | "purified" | "unknown";
   volumeMl: number | null;
-  bottles: number;
+  bottles: number | null;
   price: number;
   priceHigh: number | null;
   channel: "offline" | "meituan" | "douyin" | "other";
@@ -88,7 +88,7 @@ export const seedWater: WaterOffer[] = [
   },
 ];
 export function liters(o: WaterOffer) {
-  return o.volumeMl ? (o.volumeMl * o.bottles) / 1000 : null;
+  return o.volumeMl && o.bottles ? (o.volumeMl * o.bottles) / 1000 : null;
 }
 export function perLiter(o: WaterOffer) {
   const volume = liters(o);
@@ -146,7 +146,7 @@ export function waterResults(
           (filters.pack === "small" &&
             o.volumeMl !== null &&
             o.volumeMl < 1200) ||
-          (filters.pack === "case" && o.bottles > 1)),
+          (filters.pack === "case" && (o.bottles ?? 0) > 1)),
     )
     .sort((a, b) =>
       filters.sort === "distance"
@@ -172,21 +172,14 @@ export function validateWater(value: unknown): string | null {
   ] as const)
     if (typeof o[key] !== "string" || o[key].length > max)
       return "文本格式或长度不正确。";
-  if (
-    !o.storeId.trim() ||
-    !o.storeName.trim() ||
-    !o.address.trim() ||
-    !o.product.trim() ||
-    !o.requirements.trim()
-  )
-    return "请填写门店、地址、水名称和购买说明。";
+  if (!o.storeId.trim() || !o.storeName.trim() || !o.product.trim())
+    return "请填写门店名称。";
   if (
     !Number.isFinite(o.price) ||
     o.price < 0 ||
     o.price > 10000 ||
-    !Number.isInteger(o.bottles) ||
-    o.bottles < 1 ||
-    o.bottles > 200
+    (o.bottles !== null &&
+      (!Number.isInteger(o.bottles) || o.bottles < 1 || o.bottles > 200))
   )
     return "价格与瓶数不正确。";
   if (
@@ -242,4 +235,46 @@ export function validateWater(value: unknown): string | null {
   )
     return "优惠截止时间应晚于现在，未知时留空。";
   return null;
+}
+export function simpleWaterInput(
+  name: string,
+  price: number,
+  notes: string,
+  initial: WaterInput | null,
+  stores: Store[] = [],
+): WaterInput {
+  const storeName = name.trim();
+  const sameStore = !!initial && initial.storeName.trim() === storeName;
+  const matches = stores.filter((s) => s.name === storeName);
+  const matched = matches.length === 1 ? matches[0] : null;
+  const base = sameStore ? initial : null;
+  return {
+    storeId:
+      (base?.location ? base.storeId : matched?.id) ||
+      base?.storeId ||
+      crypto.randomUUID(),
+    storeName,
+    address: base?.address || matched?.address || "",
+    location: base?.location || matched?.location || null,
+    locationPrecision: base?.location
+      ? base.locationPrecision
+      : matched
+        ? matched.locationPrecision || "poi"
+        : "unknown",
+    product: base?.product || "饮用水 · 规格待确认",
+    waterType: base?.waterType || "unknown",
+    volumeMl: base?.volumeMl ?? null,
+    bottles: base?.bottles ?? null,
+    price,
+    priceHigh: base?.price === price ? base.priceHigh : null,
+    channel: base?.channel || "other",
+    sourceUrl: base?.sourceUrl || "",
+    requirements: notes.trim(),
+    observedOn: base?.price === price ? base.observedOn : "",
+    validUntil:
+      base?.validUntil && Date.parse(base.validUntil) > Date.now()
+        ? base.validUntil
+        : "",
+    status: base?.status || "unknown",
+  };
 }
