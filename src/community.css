@@ -149,6 +149,49 @@
   isolation: isolate;
   z-index: 0;
 }
+.map-type-filter {
+  position: absolute;
+  z-index: 7;
+  top: 15px;
+  left: 388px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 160px;
+  height: 42px;
+  padding: 0 10px;
+  border: 1px solid #e5e8ef;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 8px #3f526c0a;
+  color: #707887;
+  font-size: 12px;
+}
+.map-type-filter select {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: #44365c;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.map-type-filter:focus-within {
+  outline: 2px solid var(--purple);
+  outline-offset: 2px;
+}
+@media (max-width: 799px) {
+  .map-type-filter {
+    top: 10px;
+    left: 10px;
+    width: 138px;
+    height: 38px;
+    padding: 0 8px;
+    font-size: 11px;
+  }
+}
 .app-shell .sidebar {
   z-index: 5;
 }

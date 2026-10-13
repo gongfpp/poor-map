@@ -80,13 +80,25 @@ test("shared stores default to all, only two categories and no product price con
   await expect(page.getByLabel("价格上限")).toHaveCount(0);
   await expect(page.locator(".results")).not.toContainText("演示");
   await expect(page.locator(".results")).not.toContainText("¥");
+  const mapType = page.getByLabel("地图门店类型");
+  await expect(mapType).toBeVisible();
+  await expect(mapType).toHaveValue("all");
+  await mapType.selectOption("mixue");
+  await expect(page.locator(".store-card")).toHaveCount(1);
+  await expect(page.locator(".map-topbar h2")).toContainText("1");
+  await expect(
+    page.getByRole("button", { name: "蜜雪冰城", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "硬折扣店", exact: true }).click();
+  await expect(mapType).toHaveValue("discount");
   await expect(page.locator(".store-card")).toHaveCount(2);
   await page.getByLabel("搜索门店").fill("好特卖");
   await expect(page.locator(".store-card")).toHaveCount(1);
   await page.getByLabel("搜索门店").fill("");
   await page.getByRole("button", { name: "蜜雪冰城", exact: true }).click();
   await expect(page.locator(".store-card")).toHaveCount(1);
+  await mapType.selectOption("all");
+  await expect(page.locator(".store-card")).toHaveCount(3);
 });
 test("bookmarks survive reload and coarse location remains labelled", async ({
   page,

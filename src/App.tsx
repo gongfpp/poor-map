@@ -666,6 +666,28 @@ export default function App() {
           className={`map-panel ${mobileMap ? "mobile-visible" : ""}`}
           aria-label="附近线索地图"
         >
+          <label className="map-type-filter">
+            <span>类型</span>
+            <select
+              aria-label="地图门店类型"
+              value={category}
+              onChange={(e) => {
+                setCategory(e.target.value);
+                setSelected(null);
+                track("filter_change", {
+                  field: "category",
+                  category: e.target.value,
+                });
+              }}
+            >
+              <option value="all">全部</option>
+              {activeCategories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="map-topbar">
             <div>
               <h2>

@@ -73,9 +73,18 @@ try {
     if (name === "mobile")
       await page.getByRole("button", { name: "看列表", exact: true }).click();
     assert.ok(!(await page.locator(".results").innerText()).includes("演示"));
+    const mapType = page.getByLabel("地图门店类型");
+    await expect(mapType).toBeVisible();
+    await mapType.selectOption("mixue");
+    await expect(page.locator(".store-card").first()).toContainText("蜜雪冰城");
+    await expect(
+      page.getByRole("button", { name: "蜜雪冰城", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "硬折扣店", exact: true }).click();
+    await expect(mapType).toHaveValue("discount");
     assert.ok((await page.locator(".store-card").count()) >= 1);
     await page.getByRole("button", { name: "全部", exact: true }).click();
+    await expect(mapType).toHaveValue("all");
     await page
       .getByRole("button", {
         name: "收藏 好特卖 · 天一广场东鼓道",
