@@ -6,12 +6,14 @@ for (const route of ["/", "/#/water"]) {
     page,
   }) => {
     const resetAt = Date.now() + 3000;
+    await page.clock.install({ time: new Date(resetAt - 3000) });
+    await page.clock.pauseAt(new Date(resetAt - 3000));
+    let restored = false;
     let configs = 0,
       searches = 0,
       refreshes = 0;
     await page.route("**/api/water/config*", (r) => {
       configs++;
-      const restored = Date.now() >= resetAt;
       return r.fulfill({
         json: {
           provider: "amap",
@@ -49,6 +51,8 @@ for (const route of ["/", "/#/water"]) {
         ? page.getByRole("button", { name: "分享省钱线索", exact: true })
         : page.getByRole("button", { name: "补充水价", exact: true });
     await expect(submit).toBeDisabled();
+    restored = true;
+    await page.clock.runFor(5000);
     await expect(submit).toBeEnabled({ timeout: 10000 });
     expect(configs).toBeGreaterThan(1);
     expect(configs).toBeLessThanOrEqual(3);
