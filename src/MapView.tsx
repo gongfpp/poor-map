@@ -163,9 +163,12 @@ function LegacyMapView({
   useEffect(() => {
     if (!map.current || !ready) return;
     map.current.remove(markers.current);
-    const groups = waterMode
-      ? stores.map((s) => ({ stores: [s], location: s.location }))
-      : clusterStores(stores, markerZoom, selected);
+    const groups = clusterStores(
+      stores,
+      markerZoom,
+      selected,
+      waterMode ? 128 : 42,
+    );
     markers.current = groups.map((group) => {
       const s = group.stores[0],
         clustered = group.stores.length > 1;
@@ -182,7 +185,9 @@ function LegacyMapView({
           : categories.find((c) => c.id === s.category)!.color,
       );
       button.textContent = clustered
-        ? String(group.stores.length)
+        ? waterMode
+          ? `${s.name.split(/[·（(]/)[0].trim()}等${group.stores.length}家`
+          : String(group.stores.length)
         : markerLabels?.[s.id] ||
           (waterMode
             ? s.name

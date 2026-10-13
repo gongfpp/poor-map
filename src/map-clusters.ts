@@ -5,10 +5,11 @@ export function clusterStores(
   stores: Store[],
   zoom: number,
   selected: string | null = null,
+  cellPixels = 42,
 ): StoreCluster[] {
   if (zoom >= 19)
     return stores.map((s) => ({ stores: [s], location: s.location }));
-  const cell = (42 * 360) / (256 * 2 ** Math.max(3, zoom)),
+  const cell = (cellPixels * 360) / (256 * 2 ** Math.max(3, zoom)),
     groups = new Map<string, Store[]>();
   for (const store of stores) {
     const [lng, lat] = store.location,

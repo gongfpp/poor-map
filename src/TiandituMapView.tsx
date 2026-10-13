@@ -163,9 +163,12 @@ export default function TiandituMapView({
     const group = pins.current;
     if (!group) return;
     group.clearLayers();
-    const groups = waterMode
-      ? stores.map((s) => ({ stores: [s], location: s.location }))
-      : clusterStores(stores, currentZoom, selected);
+    const groups = clusterStores(
+      stores,
+      currentZoom,
+      selected,
+      waterMode ? 128 : 42,
+    );
     groups.forEach((entry) => {
       const s = entry.stores[0],
         clustered = entry.stores.length > 1;
@@ -185,7 +188,9 @@ export default function TiandituMapView({
           : cat.color,
       );
       button.textContent = clustered
-        ? String(entry.stores.length)
+        ? waterMode
+          ? `${s.name.split(/[·（(]/)[0].trim()}等${entry.stores.length}家`
+          : String(entry.stores.length)
         : markerLabels?.[s.id] || (waterMode ? s.name : cat.short);
       button.title = clustered
         ? `${entry.stores.length}家参考门店，点击展开`

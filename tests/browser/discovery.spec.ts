@@ -155,6 +155,7 @@ test("water candidates never gain a price or enter the liter ranking", async ({
             ...fixture,
             id: "td-fixture-market",
             name: "测试超市",
+            location: [121.54, 29.875],
             category: "market",
           },
         ],
