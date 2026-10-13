@@ -9,7 +9,7 @@ import { createWaterDB } from "../server/water-db.mjs";
 import { seedWater } from "../src/water-domain";
 import { seedStores } from "../src/store-domain";
 import { mergeStores } from "../src/discovery";
-test("AMap home discovery enables only the two categories, filters headquarters/remote points and never invents prices", async () => {
+test("AMap home discovery enables discount, mixue and supermarkets, filters headquarters/remote points and never invents prices", async () => {
   let calls = 0;
   const data = await amapDiscovery(
     new URL(
@@ -20,13 +20,14 @@ test("AMap home discovery enables only the two categories, filters headquarters/
       calls++;
       assert.equal(p.offset, 25);
       assert.equal(p.location, "121.55,29.873");
-      const mixue = p.keywords === "蜜雪冰城";
+      const mixue = p.keywords === "蜜雪冰城",
+        supermarket = p.keywords.includes("永辉");
       return {
         count: "30",
         pois: [
           {
-            id: mixue ? "mixue" : "discount",
-            name: mixue ? "蜜雪冰城" : "赵一鸣零食",
+            id: mixue ? "mixue" : supermarket ? "supermarket" : "discount",
+            name: mixue ? "蜜雪冰城" : supermarket ? "永辉超市" : "赵一鸣零食",
             location: "121.551,29.873",
             price: 0,
           },
@@ -40,12 +41,12 @@ test("AMap home discovery enables only the two categories, filters headquarters/
       };
     },
   );
-  assert.equal(calls, 2);
+  assert.equal(calls, 3);
   assert.ok("stores" in data);
-  assert.equal(data.stores.length, 2);
+  assert.equal(data.stores.length, 3);
   assert.deepEqual(
     data.stores.map((s: any) => s.category),
-    ["discount", "mixue"],
+    ["discount", "mixue", "supermarket"],
   );
   assert.ok(
     data.stores.every((s: any) => s.source === "amap" && !("price" in s)),

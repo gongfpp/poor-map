@@ -1111,6 +1111,7 @@ function StoreForm({
         <select name="category" aria-label="分类">
           <option value="discount">硬折扣店（含量贩零食）</option>
           <option value="mixue">蜜雪冰城</option>
+          <option value="supermarket">大型商超</option>
         </select>
       </label>
       <label>

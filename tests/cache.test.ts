@@ -139,6 +139,7 @@ test("cache applies exact radius, mode categories and scope isolation before pre
         place("bbox-only", 0.034),
         { ...place("mixue"), name: "蜜雪冰城", category: "mixue" },
         { ...place("market"), name: "超市", category: "market" },
+        { ...place("supermarket"), name: "沃尔玛", category: "supermarket" },
       ],
       run,
     );
@@ -150,10 +151,12 @@ test("cache applies exact radius, mode categories and scope isolation before pre
     assert.deepEqual(home.stores.map((s: Store) => s.id).sort(), [
       "mixue",
       "near",
+      "supermarket",
     ]);
     assert.deepEqual(water.stores.map((s: Store) => s.id).sort(), [
       "market",
       "near",
+      "supermarket",
     ]);
     assert.deepEqual(
       qa.stores.map((s: Store) => s.id),
@@ -187,11 +190,11 @@ test("manual refresh failure keeps old records, dates and subsequent GET availab
       env,
     );
     assert.equal(refreshed.status, 503);
-    assert.equal(calls, 2);
+    assert.equal(calls, 3);
     const data = await (await worker.fetch(request(query), env)).json();
     assert.equal(data.stores[0].id, "BCACHE");
     assert.equal(data.stores[0].cachedAt, oldDate);
-    assert.equal(calls, 2);
+    assert.equal(calls, 3);
     const row = await DB.prepare(
       "SELECT COUNT(*) AS count FROM cache_runs",
     ).first();
@@ -501,7 +504,7 @@ test("refresh quota denial leaves saved places readable and makes no extra suppl
         ).status,
         503,
       );
-    assert.equal(calls, 20);
+    assert.equal(calls, 30);
     const limited = await worker.fetch(
       request("/api/water/candidates", "POST", {
         center,
@@ -512,12 +515,12 @@ test("refresh quota denial leaves saved places readable and makes no extra suppl
       env,
     );
     assert.equal(limited.status, 429);
-    assert.equal(calls, 20);
+    assert.equal(calls, 30);
     assert.equal(
       (await (await worker.fetch(request(query), env)).json()).stores[0].id,
       "BCACHE",
     );
-    assert.equal(calls, 20);
+    assert.equal(calls, 30);
   } finally {
     DB.close();
   }

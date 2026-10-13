@@ -66,7 +66,7 @@ test("query partial failures remain visible while successful candidates are dist
     undefined,
     fetcher as typeof fetch,
   );
-  assert.equal(calls, 7);
+  assert.equal(calls, 14);
   assert.equal(d.stores.length, 1);
   assert.ok(d.warnings.some((x) => x.includes("好特卖")));
   assert.ok(d.warnings.some((x) => x.includes("20家")));

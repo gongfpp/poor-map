@@ -5,6 +5,12 @@ import {
   type Store,
   type Category,
 } from "./domain";
+import {
+  brandQueries,
+  matchesBrand,
+  brandCategory,
+  isStoreName,
+} from "./store-brands";
 import { WATER_API } from "./config";
 import { track } from "./telemetry";
 function validSavedStore(s: any): s is Store {
@@ -17,7 +23,7 @@ function validSavedStore(s: any): s is Store {
     s.name.length <= 80 &&
     typeof s.address === "string" &&
     ["amap", "tianditu", "tencent", "baidu"].includes(s.source) &&
-    ["discount", "mixue", "market"].includes(s.category) &&
+    ["discount", "mixue", "supermarket", "market"].includes(s.category) &&
     Array.isArray(s.location) &&
     s.location.length === 2 &&
     s.location.every(Number.isFinite) &&
@@ -130,15 +136,7 @@ export function cacheDescription(data: any) {
     : "";
   return `已保存 ${data.stores.length} 家门店${at ? " · " + at : ""} · 只手动更新。${data.limited ? "结果较多，仅展示最近500家。" : ""}${(data.warnings || []).join(" ")}`;
 }
-const brands: [Category, string][] = [
-  ["mixue", "蜜雪冰城"],
-  ["discount", "赵一鸣"],
-  ["discount", "零食很忙"],
-  ["discount", "零食有鸣"],
-  ["discount", "好特卖"],
-  ["discount", "嗨特购"],
-  ["discount", "奥特乐"],
-];
+const brands: [Category, string][] = brandQueries;
 type Result = { stores: Store[]; truncated: boolean };
 const cache = new Map<string, { expires: number; result: Result }>();
 let nextRequestAt = 0;
@@ -203,16 +201,14 @@ export function parsePois(
       !p ||
       typeof p.name !== "string" ||
       !(
-        p.name.includes(keyword) ||
-        (keyword === "好特卖" && /hotmaxx/i.test(p.name)) ||
+        matchesBrand(p.name, keyword) ||
         (keyword === "超市" &&
           /超市|超级市场|便利店|生鲜/.test(`${p.name} ${p.typeName || ""}`))
       ) ||
       typeof p.lonlat !== "string"
     )
       return [];
-    if (/总部|总仓|仓库|供应链|分公司|有限公司|配送中心|培训/.test(p.name))
-      return [];
+    if (!isStoreName(p.name)) return [];
     const point = p.lonlat
       .trim()
       .split(/[,\s]+/)
@@ -237,7 +233,7 @@ export function parsePois(
         id: "td-" + id,
         name,
         address,
-        category,
+        category: brandCategory(name) || category,
         location: wgs84ToGcj02(point as [number, number]),
         locationPrecision: "poi" as const,
         tags: [],
@@ -261,7 +257,7 @@ export async function discoverStores(
   const geographic = gcj02ToWgs84(center).map((n) => Number(n.toFixed(3))); // Approximate search anchor; exact device coordinates are not persisted or sent.
   const queries = water
     ? [
-        ...brands.filter(([cat]) => cat === "discount"),
+        ...brands.filter(([cat]) => cat !== "mixue"),
         ["market", "超市"] as [Category, string],
       ]
     : brands;
@@ -316,7 +312,8 @@ export async function discoverStores(
         successes++;
         for (const store of result.stores)
           if (distance(center, store.location) <= radius)
-            found.set(store.id, store);
+            if (!found.has(store.id) || store.category !== "market")
+              found.set(store.id, store);
         if (result.truncated)
           warnings.push(`${keyword}仅取首批20家，可缩小范围。`);
         if (!signal?.aborted) onProgress?.([...found.values()]);

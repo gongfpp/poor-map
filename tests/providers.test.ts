@@ -1,3 +1,4 @@
+import { brandQueries } from "../src/store-brands";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { backupDiscovery, providerConfigured } from "../worker/providers.mjs";
@@ -80,7 +81,7 @@ test("Tencent backup uses official host and GCJ-02 lat,lng inputs, with category
       });
     },
   );
-  assert.equal(calls, 7);
+  assert.equal(calls, 14);
   assert.equal(data.stores.length, 1);
   assert.equal(data.stores[0].id, "qq-valid");
   assert.equal(data.stores[0].source, "tencent");
@@ -111,15 +112,9 @@ test("Baidu backup explicitly uses GCJ-02 input and output without second offset
           {
             uid:
               "id-" +
-              [
-                "赵一鸣",
-                "零食很忙",
-                "零食有鸣",
-                "好特卖",
-                "嗨特购",
-                "奥特乐",
-                "超市",
-              ].indexOf(input.searchParams.get("query")!),
+              [...brandQueries.map(([, keyword]) => keyword), "超市"].indexOf(
+                input.searchParams.get("query")!,
+              ),
             name: input.searchParams.get("query"),
             location: { lng: center[0], lat: center[1] },
           },
@@ -127,7 +122,7 @@ test("Baidu backup explicitly uses GCJ-02 input and output without second offset
       });
     },
   );
-  assert.equal(data.stores.length, 7);
+  assert.equal(data.stores.length, 14);
   assert.ok(
     data.stores.every(
       (s: any) => s.source === "baidu" && distance(s.location, center) < 0.001,
@@ -158,15 +153,7 @@ test("Tianditu backup converts query to geographic coordinates and results back 
           {
             hotPointID:
               "id-" +
-              [
-                "赵一鸣",
-                "零食很忙",
-                "零食有鸣",
-                "好特卖",
-                "嗨特购",
-                "奥特乐",
-                "蜜雪冰城",
-              ].indexOf(query.keyWord),
+              brandQueries.map(([, keyword]) => keyword).indexOf(query.keyWord),
             name: query.keyWord,
             lonlat: geographic.join(","),
           },
@@ -174,7 +161,7 @@ test("Tianditu backup converts query to geographic coordinates and results back 
       });
     },
   );
-  assert.equal(data.stores.length, 7);
+  assert.equal(data.stores.length, 14);
   assert.ok(data.stores.every((s: any) => distance(s.location, center) < 0.05));
 });
 

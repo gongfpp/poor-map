@@ -21,7 +21,7 @@ export async function savePlaces(env, scope, stores, run, stats = null) {
     if (
       !s ||
       !["amap", "tencent", "baidu", "tianditu"].includes(s.source) ||
-      !["discount", "mixue", "market"].includes(s.category) ||
+      !["discount", "mixue", "supermarket", "market"].includes(s.category) ||
       !validateArea(s.location, 1000) ||
       typeof s.id !== "string" ||
       !/^[\w-]{1,160}$/.test(s.id) ||
@@ -85,7 +85,9 @@ export function validPlaceFilters(filters = {}, mode = "home") {
     filters &&
     [
       "all",
-      ...(mode === "home" ? ["discount", "mixue"] : ["discount", "market"]),
+      ...(mode === "home"
+        ? ["discount", "mixue", "supermarket"]
+        : ["discount", "supermarket", "market"]),
     ].includes(filters.category || "all") &&
     (filters.query == null ||
       (typeof filters.query === "string" && filters.query.length <= 80))
@@ -107,13 +109,13 @@ export async function readPlaces(
     dx = dy / Math.cos((center[1] * Math.PI) / 180),
     cats =
       filters.category && filters.category !== "all"
-        ? [filters.category, filters.category]
+        ? [filters.category]
         : mode === "home"
-          ? ["discount", "mixue"]
-          : ["discount", "market"],
+          ? ["discount", "mixue", "supermarket"]
+          : ["discount", "supermarket", "market"],
     query = (filters.query || "").trim();
   const rows = await env.DB.prepare(
-    "SELECT record,fetched_at,city FROM cached_pois WHERE scope=? AND category IN (?,?) AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ? AND (?='' OR instr(lower(json_extract(record,'$.name') || ' ' || json_extract(record,'$.address')), lower(?))>0) ORDER BY (lng-?)*(lng-?)*?+(lat-?)*(lat-?) LIMIT 650",
+    `SELECT record,fetched_at,city FROM cached_pois WHERE scope=? AND category IN (${cats.map(() => "?").join(",")}) AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ? AND (?='' OR instr(lower(json_extract(record,'$.name') || ' ' || json_extract(record,'$.address')), lower(?))>0) ORDER BY (lng-?)*(lng-?)*?+(lat-?)*(lat-?) LIMIT 650`,
   )
     .bind(
       scope,

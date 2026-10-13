@@ -1,6 +1,7 @@
+import { discoveryGroups } from "./store-brands.ts";
 import { collectionCenters } from "./collection-centers.ts";
 export type Category =
-  "snack" | "discount" | "daily" | "market" | "meal" | "mixue";
+  "snack" | "discount" | "daily" | "market" | "meal" | "mixue" | "supermarket";
 export type DealKind = "free" | "checkin" | "discount";
 export type Store = {
   id: string;
@@ -91,7 +92,7 @@ export const activeCategories = [
     label: "硬折扣店",
     short: "折扣",
     color: "#8a68d8",
-    keywords: "赵一鸣零食|零食很忙|零食有鸣|好特卖|嗨特购|奥特乐",
+    keywords: discoveryGroups("home")[0][1],
   },
   {
     id: "mixue" as Category,
@@ -100,8 +101,15 @@ export const activeCategories = [
     color: "#e47b86",
     keywords: "蜜雪冰城",
   },
+  {
+    id: "supermarket" as Category,
+    label: "大型商超",
+    short: "商超",
+    color: "#4c9b82",
+    keywords: "永辉|沃尔玛|大润发|三江购物",
+  },
 ];
-categories.push(activeCategories[1]);
+categories.push(activeCategories[1], activeCategories[2]);
 export const cities = [
   { name: "宁波", center: [121.55027, 29.87386] as [number, number] },
   ...collectionCenters.filter((c) => c.name !== "宁波"),

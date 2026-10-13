@@ -1,6 +1,12 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { parse } from "dotenv";
 import { collectionCities, cityListSource } from "../src/collection-cities.ts";
+import {
+  brandQueries,
+  matchesBrand,
+  brandCategory,
+  isStoreName,
+} from "../src/store-brands.ts";
 const env = { ...parse(readFileSync(".env", "utf8")), ...process.env };
 if (!env.AMAP_WEB_SERVICE_KEY)
   throw Error("Missing private research map credential.");
@@ -19,15 +25,7 @@ const cities =
     : selection === "priority"
       ? collectionCities.filter((c) => c.priority)
       : collectionCities.filter((c) => selection.split(",").includes(c.name));
-const keywords = [
-  ["discount", "赵一鸣"],
-  ["discount", "零食很忙"],
-  ["discount", "零食有鸣"],
-  ["discount", "好特卖"],
-  ["discount", "嗨特购"],
-  ["discount", "奥特乐"],
-  ["mixue", "蜜雪冰城"],
-];
+const keywords = brandQueries;
 mkdirSync(".data", { recursive: true });
 const file = ".data/city-collection.json",
   job = existsSync(file)
@@ -84,9 +82,9 @@ function normalize(p, category, keyword, root) {
     !(p.adcode
       ? String(p.adcode).startsWith(prefix(root.adcode))
       : String(p.cityname || "").replace(/市$/, "") === root.name) ||
-    /总部|总仓|仓库|供应链|分公司|有限公司|配送中心|培训/.test(name) ||
-    (!name.includes(keyword) &&
-      !(keyword === "好特卖" && /hotmaxx/i.test(name)))
+    !isStoreName(name) ||
+    brandCategory(name) !== category ||
+    !matchesBrand(name, keyword)
   )
     return null;
   return {
@@ -125,11 +123,13 @@ async function fetchSegment(
   depth = 0,
   bounds = null,
 ) {
+  const types = category === "supermarket" ? "060400" : "";
   const key = [
     category,
     keyword,
     area.adcode,
     bounds?.join(",") || "text",
+    ...(types ? [types] : []),
   ].join(":");
   if (entry.segments[key]?.scanned || entry.segments[key]?.complete) return;
   const params = bounds
@@ -148,6 +148,7 @@ async function fetchSegment(
         page: 1,
         extensions: "base",
       };
+  if (types) params.types = types;
   const path = bounds ? "/v3/place/polygon" : "/v3/place/text",
     d = await api(path, params),
     count = Number(d.count) || 0;
@@ -247,7 +248,13 @@ for (const c of ordered) {
     delete entry.lastError;
     checkpoint();
   }
-  if (entry.scanned || entry.complete) {
+  const currentKeywords = keywords.map(
+    ([category, keyword]) =>
+      category + ":" + keyword + (category === "supermarket" ? ":060400" : ""),
+  );
+  const unchanged =
+    JSON.stringify(entry.keywordSet || []) === JSON.stringify(currentKeywords);
+  if ((entry.scanned || entry.complete) && unchanged) {
     console.log(c.name + " 已有已读取分页快照，跳过重复请求。");
     continue;
   }
@@ -269,6 +276,7 @@ for (const c of ordered) {
         adcode: entry.adcode,
       });
     entry.complete = Object.values(entry.segments).every((s) => s.complete);
+    entry.keywordSet = currentKeywords;
     entry.scanned = true;
     delete entry.lastError;
     entry.fetchedAt = new Date().toISOString();

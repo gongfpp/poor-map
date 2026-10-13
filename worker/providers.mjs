@@ -1,7 +1,12 @@
 import { gcj02ToWgs84, wgs84ToGcj02, distance } from "../src/domain.ts";
 import { validateArea } from "./place-cache.mjs";
 import { signBaiduUrl } from "./baidu-sign.mjs";
-const names = ["赵一鸣", "零食很忙", "零食有鸣", "好特卖", "嗨特购", "奥特乐"];
+import {
+  brandQueries,
+  matchesBrand,
+  brandCategory,
+  isStoreName,
+} from "../src/store-brands.ts";
 export const providerNames = {
   amap: "高德",
   tencent: "腾讯",
@@ -55,8 +60,10 @@ export async function backupDiscovery(
     throw Error("查询区域或模式无效。");
   if (!providerConfigured(env, provider))
     throw Error(providerNames[provider] + "查询未配置。");
-  const queries = names.map((n) => ["discount", n]);
-  queries.push(mode === "home" ? ["mixue", "蜜雪冰城"] : ["market", "超市"]);
+  const queries = brandQueries.filter(
+    ([category]) => mode === "home" || category !== "mixue",
+  );
+  if (mode === "water") queries.push(["market", "超市"]);
   const stores = new Map(),
     warnings = [];
   let ok = 0;
@@ -174,22 +181,19 @@ export async function backupDiscovery(
           /-(undefined|null)$/.test(p.id) ||
           !validateArea(p.location, 1000) ||
           distance(center, p.location) > radius ||
-          /总部|仓库|分公司|有限公司|配送中心|培训/.test(p.name)
+          !isStoreName(p.name)
         )
           continue;
-        if (
-          category !== "market" &&
-          !p.name.includes(keyword) &&
-          !(keyword === "好特卖" && /hotmaxx/i.test(p.name))
-        )
+        if (category !== "market" && !matchesBrand(p.name, keyword)) continue;
+        if (category !== "market" && brandCategory(p.name) !== category)
           continue;
-        if (stores.has(p.id) && stores.get(p.id).category === "discount")
+        if (stores.has(p.id) && stores.get(p.id).category !== "market")
           continue;
         stores.set(p.id, {
           ...p,
           name: p.name.slice(0, 80),
           address: typeof p.address === "string" ? p.address.slice(0, 200) : "",
-          category,
+          category: brandCategory(p.name) || category,
           tags: [],
           source: provider,
           locationPrecision: "poi",

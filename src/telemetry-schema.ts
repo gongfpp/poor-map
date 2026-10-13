@@ -62,7 +62,7 @@ export function cleanProperties(
 ): Record<string, string | number | boolean> {
   if (!raw || typeof raw !== "object") return {};
   const allowedStrings: Record<string, string[]> = {
-    category: ["all", "discount", "mixue", "snack", "market"],
+    category: ["all", "discount", "mixue", "supermarket", "snack", "market"],
     feed: ["nearby", "events", "saved"],
     action: [
       "open",

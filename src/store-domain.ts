@@ -5,7 +5,7 @@ export type SharedStore = Store & {
 };
 export type StoreInput = {
   name: string;
-  category: "discount" | "mixue";
+  category: "discount" | "mixue" | "supermarket";
   address: string;
   location: [number, number];
 };
@@ -31,8 +31,8 @@ export function validateStore(input: StoreInput) {
     input.name.trim().length > 80
   )
     return "请填写门店名称（2—80字）。";
-  if (!["discount", "mixue"].includes(input.category))
-    return "请选择硬折扣店或蜜雪冰城。";
+  if (!["discount", "mixue", "supermarket"].includes(input.category))
+    return "请选择门店类型。";
   if (typeof input.address !== "string" || input.address.length > 200)
     return "地址最多200字。";
   if (

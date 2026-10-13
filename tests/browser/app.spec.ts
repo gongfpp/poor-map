@@ -16,6 +16,12 @@ const fixtures = [
     location: [121.55, 29.875],
   },
 ];
+fixtures.push({
+  ...fixtures[2],
+  id: "test-supermarket",
+  name: "测试沃尔玛",
+  category: "supermarket",
+});
 let comments: any[] = [];
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/water/candidates**", (r) =>
@@ -70,10 +76,10 @@ test.beforeEach(async ({ page }) => {
   )
     await page.getByRole("button", { name: "看列表", exact: true }).click();
 });
-test("shared stores default to all, only two categories and no product price controls", async ({
+test("shared stores default to all, three categories and no product price controls", async ({
   page,
 }) => {
-  await expect(page.locator(".store-card")).toHaveCount(3);
+  await expect(page.locator(".store-card")).toHaveCount(4);
   await expect(
     page.getByRole("button", { name: "全部", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -83,6 +89,12 @@ test("shared stores default to all, only two categories and no product price con
   const mapType = page.getByLabel("地图门店类型");
   await expect(mapType).toBeVisible();
   await expect(mapType).toHaveValue("all");
+  await mapType.selectOption("supermarket");
+  await expect(page.locator(".store-card")).toHaveCount(1);
+  await expect(page.locator(".results")).toContainText("测试沃尔玛");
+  await expect(
+    page.getByRole("button", { name: "大型商超", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await mapType.selectOption("mixue");
   await expect(page.locator(".store-card")).toHaveCount(1);
   await expect(page.locator(".map-topbar h2")).toContainText("1");
@@ -98,7 +110,7 @@ test("shared stores default to all, only two categories and no product price con
   await page.getByRole("button", { name: "蜜雪冰城", exact: true }).click();
   await expect(page.locator(".store-card")).toHaveCount(1);
   await mapType.selectOption("all");
-  await expect(page.locator(".store-card")).toHaveCount(3);
+  await expect(page.locator(".store-card")).toHaveCount(4);
 });
 test("bookmarks survive reload and coarse location remains labelled", async ({
   page,
@@ -150,7 +162,7 @@ test("failed shared request displays retry and never switches to samples", async
     r.fulfill({ json: { stores: fixtures } }),
   );
   await page.getByRole("button", { name: "重新查询", exact: true }).click();
-  await expect(page.locator(".store-card")).toHaveCount(3);
+  await expect(page.locator(".store-card")).toHaveCount(4);
 });
 test("analytics excludes search words and stops after opt out", async ({
   page,

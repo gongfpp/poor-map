@@ -1,8 +1,9 @@
 import { distance } from "../src/domain.ts";
-const homeGroups = [
-  ["discount", "赵一鸣零食|零食很忙|零食有鸣|好特卖|嗨特购|奥特乐"],
-  ["mixue", "蜜雪冰城"],
-];
+import {
+  discoveryGroups,
+  brandCategory,
+  isStoreName,
+} from "../src/store-brands.ts";
 export async function amapDiscovery(url, env, amap) {
   const mode = url.searchParams.get("mode") || "water";
   const point = (url.searchParams.get("center") || "").split(",").map(Number);
@@ -21,14 +22,14 @@ export async function amapDiscovery(url, env, amap) {
   )
     return { error: "查询中心或范围无效。", status: 400 };
   const center = point.map((n) => Number(n.toFixed(3)));
-  const groups =
-    mode === "home" ? homeGroups : [homeGroups[0], ["market", "三江购物|超市"]];
+  const groups = discoveryGroups(mode);
   const results = await Promise.allSettled(
     groups.map(async ([category, keywords]) => {
       const d = await amap(env, "/v3/place/around", {
         location: center.join(","),
         radius: Math.min(10000, radius + 100),
         keywords,
+        ...(category === "supermarket" ? { types: "060400" } : {}),
         offset: 25,
         page: 1,
         extensions: "base",
@@ -42,13 +43,13 @@ export async function amapDiscovery(url, env, amap) {
   results.forEach((r, i) => {
     if (r.status === "rejected") {
       warnings.push(
-        `${groups[i][0] === "mixue" ? "蜜雪冰城" : groups[i][0] === "market" ? "超市" : "硬折扣"}查询暂不可用。`,
+        `${groups[i][0] === "mixue" ? "蜜雪冰城" : groups[i][0] === "supermarket" ? "大型商超" : groups[i][0] === "market" ? "超市" : "硬折扣"}查询暂不可用。`,
       );
       return;
     }
     if (r.value.count > r.value.pois.length)
       warnings.push(
-        `${r.value.category === "mixue" ? "蜜雪冰城" : r.value.category === "market" ? "超市" : "硬折扣"}仅取首批25家，可缩小范围。`,
+        `${r.value.category === "mixue" ? "蜜雪冰城" : r.value.category === "supermarket" ? "大型商超" : r.value.category === "market" ? "超市" : "硬折扣"}仅取首批25家，可缩小范围。`,
       );
     for (const p of r.value.pois) {
       const location = String(p.location || "")
@@ -58,7 +59,7 @@ export async function amapDiscovery(url, env, amap) {
       if (
         !/^[\w-]{1,80}$/.test(p.id || "") ||
         !name ||
-        /总部|总仓|仓库|供应链|分公司|有限公司|配送中心|培训/.test(name) ||
+        !isStoreName(name) ||
         location.length !== 2 ||
         !location.every(Number.isFinite) ||
         location[0] < 72 ||
@@ -68,12 +69,10 @@ export async function amapDiscovery(url, env, amap) {
         distance(center, location) > radius + 100
       )
         continue;
-      if (
-        r.value.category === "discount" &&
-        !/赵一鸣|零食很忙|零食有鸣|好特卖|hotmaxx|嗨特购|奥特乐/i.test(name)
-      )
+      const knownCategory = brandCategory(name),
+        category = knownCategory || r.value.category;
+      if (r.value.category !== "market" && knownCategory !== r.value.category)
         continue;
-      if (r.value.category === "mixue" && !name.includes("蜜雪冰城")) continue;
       if (found.has(p.id) && found.get(p.id).category === "discount") continue;
       found.set(p.id, {
         id: p.id,
@@ -84,7 +83,7 @@ export async function amapDiscovery(url, env, amap) {
           .slice(0, 200),
         location,
         locationPrecision: "poi",
-        category: r.value.category,
+        category,
         tags: [],
         source: "amap",
       });

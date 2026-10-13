@@ -5,10 +5,12 @@ import { randomUUID, createHash } from "node:crypto";
 import waterWorker from "../worker/index.mjs";
 import { getWaterDB } from "./water-db.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-export const groups = [
-  ["discount", "赵一鸣零食|零食很忙|零食有鸣|好特卖|嗨特购|奥特乐"],
-  ["mixue", "蜜雪冰城"],
-];
+import {
+  discoveryGroups,
+  brandCategory,
+  isStoreName,
+} from "../src/store-brands.ts";
+export const groups = discoveryGroups("home");
 const str = (value) => (typeof value === "string" ? value : "");
 export function createApp({ env = process.env, upstream = fetch } = {}) {
   const app = express(),
@@ -166,6 +168,7 @@ export function createApp({ env = process.env, upstream = fetch } = {}) {
         const data = await get("/v3/place/around", {
           location: rounded,
           keywords,
+          ...(cat === "supermarket" ? { types: "060400" } : {}),
           radius,
           sortrule: "distance",
           offset: 25,
@@ -192,7 +195,9 @@ export function createApp({ env = process.env, upstream = fetch } = {}) {
         if (
           location.length !== 2 ||
           !location.every(Number.isFinite) ||
-          !poi.id
+          !poi.id ||
+          !isStoreName(str(poi.name)) ||
+          brandCategory(str(poi.name)) !== cat
         )
           continue;
         if (!stores.has(poi.id))
