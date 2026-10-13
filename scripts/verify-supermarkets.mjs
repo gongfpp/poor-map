@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { chromium, expect } from "@playwright/test";
-import { matchesBrand } from "../src/store-brands.ts";
+import { matchesBrand, brandCategory } from "../src/store-brands.ts";
 
 const url = process.argv[2] || "https://gongfpp.github.io/poor-map/";
 const backend = "https://poor-map-api.gong7968.workers.dev";
@@ -16,7 +16,11 @@ for (const keyword of [
   "三江购物",
 ]) {
   const all = Object.values(job.cities).flatMap((c) => Object.values(c.stores));
-  const store = all.find((s) => matchesBrand(s.name, keyword));
+  const store = all.find(
+    (s) =>
+      brandCategory(s.name) === brandCategory(keyword) &&
+      matchesBrand(s.name.split(/[（(]/)[0], keyword),
+  );
   assert.ok(store, keyword + "未收集到参考门店");
   for (const mode of ["home", "water"]) {
     const params = new URLSearchParams({
@@ -68,7 +72,7 @@ try {
       if (u.pathname === "/api/water/candidates")
         queries.push({ method: r.request().method(), status: r.status() });
       if (/amap\.com$/.test(u.hostname) && /\/tile\/|get_tile/.test(u.pathname))
-        tiles.push(r.status());
+        tiles.push({ status: r.status(), type: r.headers()["content-type"] });
     });
     await page.goto(url, { waitUntil: "domcontentloaded" });
     await expect(page.locator(".discovery-note")).toContainText(
@@ -88,7 +92,18 @@ try {
     ).toHaveAttribute("aria-pressed", "true");
     if (size === "mobile")
       await page.getByRole("button", { name: /^看地图/ }).click();
-    await expect.poll(() => tiles.includes(200), { timeout: 30000 }).toBe(true);
+    await expect
+      .poll(
+        () =>
+          tiles.some(
+            (t) => t.status === 200 && t.type === "application/x-protobuf",
+          ),
+        { timeout: 30000 },
+      )
+      .toBe(true);
+    await expect(page.locator(".map-source")).toContainText("高德地图");
+    // Vector tiles are decoded and painted after the network response.
+    await page.waitForTimeout(4000);
     assert.ok(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
