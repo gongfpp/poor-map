@@ -46,6 +46,7 @@ function readSaved(): string[] {
     return [];
   }
 }
+const emptyEventIds = new Set<string>();
 export default function App() {
   const [config, setConfig] = useState({
       provider: "amap" as "amap" | "tianditu",
@@ -728,7 +729,7 @@ export default function App() {
               setDraftCenter(p);
               track("map_drag");
             }}
-            eventIds={new Set()}
+            eventIds={emptyEventIds}
             radiusMeters={radius}
             canLocate={true}
           />
