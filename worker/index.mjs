@@ -90,7 +90,10 @@ async function body(req) {
     throw new Error("内容过长。");
   const text = await req.text();
   if (text.length > 8192) throw new Error("内容过长。");
-  return JSON.parse(text);
+  const value = JSON.parse(text);
+  if (value === null || typeof value !== "object" || Array.isArray(value))
+    throw new SyntaxError("请求体必须是 JSON 对象。");
+  return value;
 }
 const readRateBuckets = new Map();
 async function rate(req, env, scope, maximum = 20, kind = "write") {
