@@ -3,6 +3,7 @@ import { parse } from "dotenv";
 import { collectionCities, cityListSource } from "../src/collection-cities.ts";
 import {
   brandQueries,
+  collectionQueryTypes,
   matchesBrand,
   brandCategory,
   isStoreName,
@@ -123,7 +124,7 @@ async function fetchSegment(
   depth = 0,
   bounds = null,
 ) {
-  const types = category === "supermarket" ? "060400" : "";
+  const types = collectionQueryTypes(category, keyword);
   const key = [
     category,
     keyword,
@@ -248,9 +249,10 @@ for (const c of ordered) {
     delete entry.lastError;
     checkpoint();
   }
-  const currentKeywords = keywords.map(
-    ([category, keyword]) =>
-      category + ":" + keyword + (category === "supermarket" ? ":060400" : ""),
+  const currentKeywords = keywords.map(([category, keyword]) =>
+    [category, keyword, collectionQueryTypes(category, keyword)]
+      .filter(Boolean)
+      .join(":"),
   );
   const unchanged =
     JSON.stringify(entry.keywordSet || []) === JSON.stringify(currentKeywords);

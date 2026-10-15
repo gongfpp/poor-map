@@ -56,7 +56,7 @@ test("malformed coordinates and excess radii are rejected before upstream", asyn
         assert.equal((await fetch(`${base}/api/nearby?${q}`)).status, 400);
     },
   ));
-test("POIs are deduplicated and cached without invented prices", async () => {
+test("POIs are deduplicated and stay cached after one year without invented prices", async (t) => {
   let calls = 0;
   await serve(
     {
@@ -86,6 +86,17 @@ test("POIs are deduplicated and cached without invented prices", async () => {
       assert.equal(data.stores[0].price, undefined);
       await fetch(`${base}/api/nearby?center=121.55,29.87`);
       assert.equal(calls, 3);
+      const future = Date.now() + 366 * 86400000;
+      t.mock.method(Date, "now", () => future);
+      try {
+        const cached = await (
+          await fetch(`${base}/api/nearby?center=121.55,29.87`)
+        ).json();
+        assert.equal(cached.cached, true);
+        assert.equal(calls, 3);
+      } finally {
+        t.mock.restoreAll();
+      }
     },
   );
 });

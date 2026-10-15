@@ -138,7 +138,7 @@ export function cacheDescription(data: any) {
 }
 const brands: [Category, string][] = brandQueries;
 type Result = { stores: Store[]; truncated: boolean };
-const cache = new Map<string, { expires: number; result: Result }>();
+const cache = new Map<string, Result>();
 let nextRequestAt = 0;
 function pause(ms: number, signal?: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
@@ -276,10 +276,7 @@ export async function discoverStores(
         category,
         keyword,
       ]);
-      let result =
-        cache.get(cacheKey)?.expires! > Date.now()
-          ? cache.get(cacheKey)!.result
-          : null;
+      let result = cache.get(cacheKey);
       try {
         if (!result) {
           const url = new URL("https://api.tianditu.gov.cn/v2/search");
@@ -306,7 +303,7 @@ export async function discoverStores(
             throw new Error();
           const stores = parsePois(data.pois, category, keyword);
           result = { stores, truncated: Number(data.count) > 20 };
-          cache.set(cacheKey, { expires: Date.now() + 5 * 60000, result });
+          cache.set(cacheKey, result);
           if (cache.size > 80) cache.delete(cache.keys().next().value!);
         }
         successes++;

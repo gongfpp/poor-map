@@ -1,3 +1,4 @@
+import { brandQueries } from "../src/store-brands";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { discoverStores, parsePois, mergeStores } from "../src/discovery";
@@ -66,7 +67,7 @@ test("query partial failures remain visible while successful candidates are dist
     undefined,
     fetcher as typeof fetch,
   );
-  assert.equal(calls, 14);
+  assert.equal(calls, brandQueries.length);
   assert.equal(d.stores.length, 1);
   assert.ok(d.warnings.some((x) => x.includes("好特卖")));
   assert.ok(d.warnings.some((x) => x.includes("20家")));
@@ -97,4 +98,24 @@ test("merging retains community identity and does not migrate comments on a fuzz
       .length,
     1,
   );
+});
+
+// The legacy Tianditu helper must not search again merely because time passes.
+test("successful discovery memo has no time expiry", async (t) => {
+  const key = "permanent-" + crypto.randomUUID();
+  let calls = 0;
+  const fetcher: typeof fetch = async () => {
+    calls++;
+    return Response.json({ status: { infocode: 1000 }, count: 0, pois: [] });
+  };
+  await discoverStores(key, [121.55, 29.87], 1000, false, undefined, fetcher);
+  assert.equal(calls, brandQueries.length);
+  const future = Date.now() + 366 * 86400000;
+  t.mock.method(Date, "now", () => future);
+  try {
+    await discoverStores(key, [121.55, 29.87], 1000, false, undefined, fetcher);
+    assert.equal(calls, brandQueries.length);
+  } finally {
+    t.mock.restoreAll();
+  }
 });

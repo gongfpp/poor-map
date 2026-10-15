@@ -9,12 +9,20 @@ export const brandQueries: ["discount" | "supermarket" | "mixue", string][] = [
   ["discount", "超盒算"],
   ["discount", "盒马NB"],
   ["discount", "奥乐齐"],
+  ["discount", "乐尔乐"],
   ["supermarket", "永辉超市"],
   ["supermarket", "沃尔玛"],
   ["supermarket", "大润发"],
   ["supermarket", "三江购物"],
+  ["supermarket", "物美"],
+  ["supermarket", "华润万家"],
+  ["supermarket", "盒马鲜生"],
+  ["supermarket", "家家悦"],
   ["mixue", "蜜雪冰城"],
 ];
+export function collectionQueryTypes(category: string, keyword: string) {
+  return category === "supermarket" || keyword === "乐尔乐" ? "060400" : "";
+}
 export function matchesBrand(name: string, keyword: string) {
   const compact = name.replace(/\s+/g, "");
   if (keyword === "超盒算" || keyword === "盒马NB")

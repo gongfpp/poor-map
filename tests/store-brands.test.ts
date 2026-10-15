@@ -9,6 +9,7 @@ test("NB aliases and ALDI variants share categories without turning supermarket 
     "宁波超盒算NB长丰店",
     "盒马 NB(上海店)",
     "ALDI奥乐齐(测试店)",
+    "乐尔乐特价批发超市(测试店)",
   ])
     assert.equal(brandCategory(name), "discount");
   assert.ok(matchesBrand("盒马 NB(测试店)", "超盒算"));
@@ -18,6 +19,10 @@ test("NB aliases and ALDI variants share categories without turning supermarket 
     "沃尔玛(测试店)",
     "大润发(测试店)",
     "三江购物(测试店)",
+    "物美大卖场(测试店)",
+    "华润万家(测试店)",
+    "盒马鲜生(测试店)",
+    "家家悦(测试店)",
   ])
     assert.equal(brandCategory(name), "supermarket");
   assert.equal(brandCategory("蜜雪冰城(北仑大润发一楼店)"), "mixue");

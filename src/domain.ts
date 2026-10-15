@@ -106,7 +106,7 @@ export const activeCategories = [
     label: "大型商超",
     short: "商超",
     color: "#4c9b82",
-    keywords: "永辉|沃尔玛|大润发|三江购物",
+    keywords: discoveryGroups("home").find(([c]) => c === "supermarket")![1],
   },
 ];
 categories.push(activeCategories[1], activeCategories[2]);

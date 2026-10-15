@@ -14,6 +14,11 @@ for (const keyword of [
   "沃尔玛",
   "大润发",
   "三江购物",
+  "乐尔乐",
+  "物美",
+  "华润万家",
+  "盒马鲜生",
+  "家家悦",
 ]) {
   const all = Object.values(job.cities).flatMap((c) => Object.values(c.stores));
   const store = all.find(

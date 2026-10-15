@@ -159,8 +159,7 @@ export function createApp({ env = process.env, upstream = fetch } = {}) {
     const rounded = center.map((n) => n.toFixed(6)).join(","),
       key = `${rounded}:${radius}:${category}`,
       previous = cache.get(key);
-    if (previous && Date.now() - previous.time < 300000)
-      return res.json({ ...previous.data, cached: true });
+    if (previous) return res.json({ ...previous.data, cached: true });
     const requested =
       category === "all" ? groups : groups.filter((g) => g[0] === category);
     const results = await Promise.allSettled(

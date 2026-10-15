@@ -81,7 +81,7 @@ test("Tencent backup uses official host and GCJ-02 lat,lng inputs, with category
       });
     },
   );
-  assert.equal(calls, 14);
+  assert.equal(calls, brandQueries.length);
   assert.equal(data.stores.length, 1);
   assert.equal(data.stores[0].id, "qq-valid");
   assert.equal(data.stores[0].source, "tencent");
@@ -122,7 +122,7 @@ test("Baidu backup explicitly uses GCJ-02 input and output without second offset
       });
     },
   );
-  assert.equal(data.stores.length, 14);
+  assert.equal(data.stores.length, brandQueries.length);
   assert.ok(
     data.stores.every(
       (s: any) => s.source === "baidu" && distance(s.location, center) < 0.001,
@@ -161,7 +161,7 @@ test("Tianditu backup converts query to geographic coordinates and results back 
       });
     },
   );
-  assert.equal(data.stores.length, 14);
+  assert.equal(data.stores.length, brandQueries.length);
   assert.ok(data.stores.every((s: any) => distance(s.location, center) < 0.05));
 });
 
