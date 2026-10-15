@@ -52,6 +52,7 @@ export default function App() {
       jsKey: "",
       mapReady: false,
       searchReady: false,
+      placeSearchPaused: false,
       writeReady: true,
       writePausedUntil: null as string | null,
       providers: [] as { id: string; name: string; configured: boolean }[],
@@ -506,12 +507,16 @@ export default function App() {
           <p className="discovery-note" role="status">
             {discoveryNote}
             <button
-              disabled={discovering || config.writeReady === false}
+              disabled={
+                discovering ||
+                config.writeReady === false ||
+                config.placeSearchPaused
+              }
               onClick={() => {
                 void loadSavedPlaces(true);
               }}
             >
-              刷新门店
+              {config.placeSearchPaused ? "搜店已暂停" : "刷新门店"}
             </button>
           </p>
           <NavigationPanel

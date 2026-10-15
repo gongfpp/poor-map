@@ -1,4 +1,8 @@
 import express from "express";
+import {
+  placeSearchPaused,
+  placeSearchPauseMessage,
+} from "../worker/availability.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID, createHash } from "node:crypto";
@@ -122,7 +126,8 @@ export function createApp({ env = process.env, upstream = fetch } = {}) {
       mapReady:
         !!env.TIANDITU_WEB_KEY ||
         !!(env.AMAP_JS_KEY && env.AMAP_JS_SECURITY_CODE),
-      searchReady: !!env.AMAP_WEB_SERVICE_KEY,
+      searchReady: !!env.AMAP_WEB_SERVICE_KEY && !placeSearchPaused(env),
+      placeSearchPaused: placeSearchPaused(env),
       providers: [
         {
           name: "高德地图",
@@ -134,6 +139,8 @@ export function createApp({ env = process.env, upstream = fetch } = {}) {
     }),
   );
   app.get("/api/nearby", async (req, res) => {
+    if (placeSearchPaused(env))
+      return res.status(503).json({ error: placeSearchPauseMessage });
     if (!env.AMAP_WEB_SERVICE_KEY)
       return res.status(503).json({
         error: "尚未配置高德 Web 服务 Key。请在本地 .env 中配置后重启。",
@@ -253,6 +260,11 @@ export function createApp({ env = process.env, upstream = fetch } = {}) {
     if (!env.AMAP_JS_SECURITY_CODE)
       return res.status(503).json({ error: "高德 JS 安全密钥未配置。" });
     const pathname = req.path;
+    if (
+      placeSearchPaused(env) &&
+      /^\/v[345]\/(place\/|assistant\/inputtips)/.test(pathname)
+    )
+      return res.status(503).json({ error: placeSearchPauseMessage });
     if (
       !/^\/v[345]\/(place\/(around|text|detail)|geocode\/(geo|regeo)|assistant\/inputtips|config\/district|map\/styles|log\/init)\/?$/.test(
         pathname,

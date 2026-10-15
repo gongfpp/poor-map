@@ -232,3 +232,43 @@ test("navigation requires explicit origin, draws valid route and exposes actual 
   await expect(page.locator(".navigation-error")).toContainText("暂不可用");
   await expect(page.locator(".navigation-result")).toHaveCount(0);
 });
+
+test("paused search keeps cached home and water candidates visible with disabled refresh", async ({
+  page,
+}) => {
+  let refreshes = 0;
+  page.on("request", (r) => {
+    if (r.url().includes("/api/water/candidates") && r.method() === "POST")
+      refreshes++;
+  });
+  await page.route("**/api/water/config*", (r) =>
+    r.fulfill({
+      json: {
+        provider: "tianditu",
+        jsKey: "test-discovery-key",
+        mapReady: true,
+        searchReady: false,
+        placeSearchPaused: true,
+        cacheReady: true,
+        writeReady: true,
+      },
+    }),
+  );
+  await page.route("**/api/water", (r) =>
+    r.fulfill({ json: { offers: seedWater } }),
+  );
+  await page.goto("/");
+  await list(page);
+  await expect(
+    page.getByRole("button", { name: "搜店已暂停", exact: true }),
+  ).toBeDisabled();
+  await expect(page.locator(".store-card")).toHaveCount(2);
+  await page.goto("/#/water");
+  const waterList = page.getByRole("button", { name: "列表", exact: true });
+  if (await waterList.isVisible()) await waterList.click();
+  await page.locator(".water-candidates summary").click();
+  await expect(
+    page.getByRole("button", { name: "搜店已暂停", exact: true }),
+  ).toBeDisabled();
+  expect(refreshes).toBe(0);
+});

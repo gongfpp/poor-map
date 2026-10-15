@@ -755,3 +755,77 @@ test("manual refresh metadata stores public shop identities, never a user's sear
     DB.close();
   }
 });
+
+test("manual search pause blocks refresh and SDK search without affecting permanent cache or map initialization", async () => {
+  const DB = createWaterDB();
+  const originalFetch = globalThis.fetch;
+  let upstream = 0;
+  const stubFetch: typeof fetch = async () => {
+    upstream++;
+    return Response.json({ status: "1" });
+  };
+  const env = {
+    DB,
+    PLACE_SEARCH_PAUSED: "true",
+    AMAP_WEB_SERVICE_KEY: "test",
+    AMAP_JS_KEY: "test-js",
+    AMAP_JS_SECURITY_CODE: "test-security",
+    QA_TOKEN: "test",
+    UPSTREAM_FETCH: stubFetch,
+  };
+  try {
+    globalThis.fetch = stubFetch;
+    await savePlaces(env, "public", [place()], run);
+    const config = await (
+      await worker.fetch(request("/api/water/config"), env)
+    ).json();
+    assert.equal(config.placeSearchPaused, true);
+    assert.equal(config.searchReady, false);
+    assert.equal(config.mapReady, true);
+    assert.equal(config.writeReady, true);
+    const cached = await (await worker.fetch(request(query), env)).json();
+    assert.equal(cached.stores.length, 1);
+    for (const provider of ["auto", "amap", "baidu"]) {
+      const response = await worker.fetch(
+        request("/api/water/candidates", "POST", {
+          center,
+          radius: 3000,
+          mode: "home",
+          provider,
+        }),
+        env,
+      );
+      assert.equal(response.status, 503);
+      assert.match((await response.json()).error, /搜店已暂停/);
+    }
+    for (const path of [
+      "v3/place/around",
+      "v5/place/text",
+      "v3/place/detail",
+      "v3/assistant/inputtips",
+    ]) {
+      const response = await worker.fetch(
+        request("/_AMapService/" + path),
+        env,
+      );
+      assert.equal(response.status, 503);
+    }
+    assert.equal(upstream, 0);
+    assert.equal(
+      (await worker.fetch(request("/_AMapService/v3/log/init"), env)).status,
+      200,
+    );
+    assert.equal(upstream, 1);
+    const resumed = await (
+      await worker.fetch(request("/api/water/config"), {
+        ...env,
+        PLACE_SEARCH_PAUSED: "false",
+      })
+    ).json();
+    assert.equal(resumed.searchReady, true);
+    assert.equal(resumed.placeSearchPaused, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    DB.close();
+  }
+});

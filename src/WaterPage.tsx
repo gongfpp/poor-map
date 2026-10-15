@@ -106,6 +106,7 @@ export default function WaterPage() {
       jsKey: "",
       mapReady: false,
       searchReady: false,
+      placeSearchPaused: false,
       writeReady: true,
       writePausedUntil: null as string | null,
     }),
@@ -694,10 +695,12 @@ export default function WaterPage() {
               <p>
                 {candidateNote}{" "}
                 <button
-                  disabled={config.writeReady === false}
+                  disabled={
+                    config.writeReady === false || config.placeSearchPaused
+                  }
                   onClick={() => void loadSavedCandidates(true)}
                 >
-                  刷新门店
+                  {config.placeSearchPaused ? "搜店已暂停" : "刷新门店"}
                 </button>
               </p>
               {candidates.map((s) => (

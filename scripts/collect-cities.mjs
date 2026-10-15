@@ -9,6 +9,8 @@ import {
   isStoreName,
 } from "../src/store-brands.ts";
 const env = { ...parse(readFileSync(".env", "utf8")), ...process.env };
+if (env.PLACE_SEARCH_PAUSED === "true")
+  throw Error("PLACE_SEARCH_PAUSED: 手动恢复前不查询供应商。");
 if (!env.AMAP_WEB_SERVICE_KEY)
   throw Error("Missing private research map credential.");
 const selection =

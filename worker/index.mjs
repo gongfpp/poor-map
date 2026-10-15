@@ -1,4 +1,10 @@
-import { writesPaused, quotaError, quotaMessage } from "./availability.mjs";
+import {
+  writesPaused,
+  quotaError,
+  quotaMessage,
+  placeSearchPaused,
+  placeSearchPauseMessage,
+} from "./availability.mjs";
 import { communityRoute } from "./community.mjs";
 import { amapDiscovery } from "./discovery.mjs";
 import {
@@ -166,7 +172,8 @@ export async function route(req, env) {
       mapReady: td
         ? !!env.TIANDITU_WEB_KEY
         : !!(env.AMAP_JS_KEY && env.AMAP_JS_SECURITY_CODE),
-      searchReady: !!env.AMAP_WEB_SERVICE_KEY,
+      searchReady: !!env.AMAP_WEB_SERVICE_KEY && !placeSearchPaused(env),
+      placeSearchPaused: placeSearchPaused(env),
       cacheReady: true,
       writeReady: !writesPaused(env),
       writePausedUntil: writesPaused(env) ? env.WRITE_PAUSED_UNTIL : null,
@@ -205,6 +212,11 @@ export async function route(req, env) {
       )
     )
       return output({ error: "代理路径未开放。" }, 403);
+    if (
+      placeSearchPaused(env) &&
+      /^\/v[345]\/(place\/|assistant\/inputtips)/.test(upstreamPath)
+    )
+      return output({ error: placeSearchPauseMessage }, 503);
     const upstream = new URL(
       upstreamPath + url.search,
       upstreamPath.startsWith("/v4/map/styles")
@@ -238,6 +250,8 @@ export async function route(req, env) {
     if (req.method === "POST") {
       if (!isQA && !origins.has(origin))
         return output({ error: "请从地图页面手动刷新。" }, 403);
+      if (placeSearchPaused(env))
+        return output({ error: placeSearchPauseMessage }, 503);
       if (writesPaused(env)) return output({ error: quotaMessage }, 503);
       if (!(await rate(req, env, scope, 10, "refresh")))
         return output({ error: "刷新较频繁，请稍后重试。" }, 429);

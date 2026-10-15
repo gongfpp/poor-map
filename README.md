@@ -2,7 +2,7 @@
 
 以地图寻找附近硬折扣店、大型商超和蜜雪冰城，用户用一句话分享线索、回复纠错；独立「大水地图」页面比较具体水价。界面保持地图、侧栏和手机底部列表，没有banner。
 
-本轮已收集56城市、38,129条品牌门店参考记录并保存共享缓存，详见[城市采集记录](docs/COLLECTION_REPORT.md)。数据可能不完整，不能证明营业或低价。
+本轮已收集56城市、40,574条品牌门店参考记录并保存共享缓存，另有100条附近候选（共享缓存总计40,674条），详见[城市采集记录](docs/COLLECTION_REPORT.md)。数据可能不完整，不能证明营业或低价。
 
 [附近地图](https://gongfpp.github.io/poor-map/) · [大水地图](https://gongfpp.github.io/poor-map/#/water) · [GitHub 仓库](https://github.com/gongfpp/poor-map)
 

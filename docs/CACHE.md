@@ -68,3 +68,11 @@ npm run collect:cities -- --cities=priority --refresh --budget=1500
 新增品牌迭代：`src/store-brands.ts`统一查询名、别名与分类。采集保留已有segment checkpoint，仅补读未查的关键词；城市keywordSet一致才跳过。新增品牌导入可用`npm run import:cities -- --since=.data/city-collection-before-supermarkets.json`，只写新增/变化门店及采集摘要，已有参考点不会仅因新批次重写日期。首页新增大型商超分类，大水地图也读取这些候选；仍只允许手动刷新，普通访问不请求厂商搜索。
 
 2026-10-15：移除旧天地图查询辅助函数与本地兼容接口的五分钟缓存到期判断；进程内缓存按容量限制，不再按时间淘汰。线上实际使用的D1永久缓存规则不变。新增品牌类型码由`collectionQueryTypes`统一，避免报告与采集checkpoint规则分叉。普通超市补充命令`node --use-env-proxy scripts/collect-nearby-supermarkets.mjs --import`为明确管理员手动执行，固定公开参考点宁波天一广场3公里、最多200个上游结果，不使用设备GPS、不附带价格。独立/未知品牌以market候选进入大水地图，不归入硬折扣。后续迭代见[ROADMAP.md](ROADMAP.md)。
+
+## 2026-10-15 搜索额度暂停
+
+用户提示高德额度接近用完后，`PLACE_SEARCH_PAUSED=true` 暂停新增门店搜索：Worker拒绝`POST /api/water/candidates`，SDK代理拒绝place搜索与inputtips；首页与大水地图显示「搜店已暂停」。本地旧查询入口和两个采集脚本也遵守同一开关。已有D1及浏览器缓存、水价与社区读写继续工作；没有TTL、定时采集或按日期自动恢复。恢复需人工将本地.env与Worker部署变量改为false并部署。
+
+底图初始化、道路瓦片、主动路线规划与地理编码仍按原有配置工作，它们不是本次暂停的基础搜索组；不能将此开关描述为全部高德断网或账号级消费封顶。平台余额/流量包与真实剩余额度须以控制台为准。
+
+2026-10-15查阅高德[现行计费说明](https://lbs.amap.com/pages/base_service_price)及[配额说明](https://lbs.amap.com/upgrade)：个人认证基础搜索组每月5,000次、基础LBS组每月150,000次、地图定位组每月1,500,000次；同一组跨平台共享。免费月配额另有认证起一年权益期限说明，并非永久赠送；本次控制台打开超时，尚未核实账号个人权益截止日与剩余量，不从本地请求日志反推平台余额。
