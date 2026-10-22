@@ -202,7 +202,15 @@ test("interrupted pagination resumes at the next unread page and preserves saved
       job.cities.宁波.segments["discount:好特卖:330200:text"].nextPage,
       3,
     );
-    execFileSync(process.execPath, [...args, "--budget=2"], options);
+    execFileSync(
+      process.execPath,
+      [
+        ...args.filter((arg) => arg !== "--fill-gaps"),
+        "--finish-pages",
+        "--budget=2",
+      ],
+      options,
+    );
     job = JSON.parse(readFileSync(join(folder, ".data/city-collection.json")));
     assert.equal(Object.keys(job.cities.宁波.stores).length, 60);
     assert.equal(

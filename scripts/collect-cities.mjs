@@ -27,6 +27,9 @@ if (!Number.isInteger(cityLimit) || cityLimit < 1 || cityLimit > limit)
   throw Error("INVALID_CITY_REQUEST_BUDGET");
 const refresh = process.argv.includes("--refresh");
 const fillGaps = process.argv.includes("--fill-gaps");
+const finishPages = process.argv.includes("--finish-pages");
+if (finishPages && (fillGaps || refresh))
+  throw Error("Finishing pages cannot open new queries or refresh snapshots.");
 const selectedKeywords = process.argv
   .find((x) => x.startsWith("--keywords="))
   ?.slice(11)
@@ -324,6 +327,7 @@ for (const c of ordered) {
     JSON.stringify(entry.keywordSet || []) === JSON.stringify(currentKeywords);
   if (
     !fillGaps &&
+    !finishPages &&
     !selectedKeywords &&
     (entry.scanned || entry.complete) &&
     unchanged
@@ -344,10 +348,26 @@ for (const c of ordered) {
       entry.center = String(a.center).split(",").map(Number);
       checkpoint();
     }
-    for (const [category, keyword] of keywords)
-      await fetchSegment(entry, entry, category, keyword, {
-        adcode: entry.adcode,
-      });
+    if (finishPages) {
+      for (const [key, segment] of Object.entries(entry.segments)) {
+        if (!segment.inProgress) continue;
+        const [category, keyword, adcode, region] = key.split(":");
+        await fetchSegment(
+          entry,
+          entry,
+          category,
+          keyword,
+          { adcode },
+          1,
+          region === "text" ? null : region.split(",").map(Number),
+        );
+      }
+    } else {
+      for (const [category, keyword] of keywords)
+        await fetchSegment(entry, entry, category, keyword, {
+          adcode: entry.adcode,
+        });
+    }
     entry.complete = Object.values(entry.segments).every((s) => s.complete);
     if (!selectedKeywords) entry.keywordSet = currentKeywords;
     entry.scanned = true;
