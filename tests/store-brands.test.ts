@@ -35,6 +35,9 @@ test("facilities and closed shops are excluded, while users can mark an explicit
     "沃尔玛取货处",
     "奥乐齐总部",
     "永辉超市(已停业)",
+    "沃尔玛全球电商",
+    "赵一鸣装修",
+    "超盒算NB(装修)",
   ])
     assert.equal(isStoreName(name), false);
   assert.equal(isStoreName("沃尔玛(测试店)"), true);
