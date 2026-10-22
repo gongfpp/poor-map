@@ -19,6 +19,12 @@ const selection =
 const limit = Number(
   process.argv.find((x) => x.startsWith("--budget="))?.split("=")[1] || 3000,
 );
+const cityLimitArg = process.argv.find((x) =>
+  x.startsWith("--per-city-budget="),
+);
+const cityLimit = cityLimitArg ? Number(cityLimitArg.slice(18)) : limit;
+if (!Number.isInteger(cityLimit) || cityLimit < 1 || cityLimit > limit)
+  throw Error("INVALID_CITY_REQUEST_BUDGET");
 const refresh = process.argv.includes("--refresh");
 const fillGaps = process.argv.includes("--fill-gaps");
 const selectedKeywords = process.argv
@@ -46,12 +52,15 @@ const file = ".data/city-collection.json",
     ? JSON.parse(readFileSync(file, "utf8"))
     : { source: cityListSource, cities: {}, requests: 0 };
 let used = 0,
+  cityStart = 0,
   nextAt = 0;
 function checkpoint() {
   writeFileSync(file, JSON.stringify(job, null, 2) + "\n", { mode: 0o600 });
 }
 async function api(path, params) {
   if (used >= limit) throw Error("REQUEST_BUDGET_EXHAUSTED");
+  if (used - cityStart >= cityLimit)
+    throw Error("CITY_REQUEST_BUDGET_EXHAUSTED");
   const wait = Math.max(0, nextAt - Date.now());
   if (wait) await new Promise((r) => setTimeout(r, wait));
   nextAt = Date.now() + 1200;
@@ -190,7 +199,9 @@ async function fetchSegment(
       };
   if (types) params.types = types;
   const path = bounds ? "/v3/place/polygon" : "/v3/place/text",
-    d = await api(path, params),
+    d = previous?.inProgress
+      ? { count: previous.reported, pois: [] }
+      : await api(path, params),
     count = Number(d.count) || 0;
   if (count > 200) {
     if (!bounds) {
@@ -250,22 +261,37 @@ async function fetchSegment(
     checkpoint();
     return;
   }
-  const pois = [...(d.pois || [])];
-  for (let page = 2; page <= Math.ceil(count / 25); page++) {
-    const more = await api(path, { ...params, page });
-    pois.push(...(more.pois || []));
-    if (!(more.pois || []).length) break;
+  const state = previous?.inProgress
+    ? previous
+    : {
+        complete: false,
+        inProgress: true,
+        reported: count,
+        received: 0,
+        nextPage: 1,
+      };
+  function savePage(rows) {
+    for (const p of rows) {
+      const store = normalize(p, category, keyword, city);
+      if (store) entry.stores[store.id] = store;
+    }
+    state.received += rows.length;
+    state.nextPage++;
+    if (!rows.length) state.emptyPage = true;
+    entry.segments[key] = state;
+    checkpoint();
   }
-  for (const p of pois) {
-    const s = normalize(p, category, keyword, city);
-    if (s) entry.stores[s.id] = s;
+  if (state.nextPage === 1) savePage(d.pois || []);
+  while (!state.emptyPage && state.nextPage <= Math.ceil(count / 25)) {
+    const more = await api(path, { ...params, page: state.nextPage });
+    savePage(more.pois || []);
   }
   entry.segments[key] = {
-    complete: pois.length >= count,
+    complete: state.received >= count,
     scanned: true,
-    countMatched: pois.length >= count,
+    countMatched: state.received >= count,
     reported: count,
-    received: pois.length,
+    received: state.received,
   };
   checkpoint();
 }
@@ -275,6 +301,7 @@ const ordered = [...cities].sort(
     Number(b.priority) - Number(a.priority),
 );
 for (const c of ordered) {
+  cityStart = used;
   const entry = (job.cities[c.name] ||= {
     ...c,
     stores: {},
@@ -325,7 +352,7 @@ for (const c of ordered) {
     if (!selectedKeywords) entry.keywordSet = currentKeywords;
     entry.scanned = true;
     delete entry.lastError;
-    entry.fetchedAt = new Date().toISOString();
+    if (used > cityStart) entry.fetchedAt = new Date().toISOString();
     checkpoint();
     console.log(
       JSON.stringify({
@@ -333,11 +360,12 @@ for (const c of ordered) {
         stores: Object.keys(entry.stores).length,
         complete: entry.complete,
         requestsThisRun: used,
+        requestsThisCity: used - cityStart,
       }),
     );
   } catch (e) {
     entry.lastError = e.message;
-    entry.fetchedAt = new Date().toISOString();
+    if (used > cityStart) entry.fetchedAt = new Date().toISOString();
     checkpoint();
     console.log(
       JSON.stringify({
@@ -345,6 +373,7 @@ for (const c of ordered) {
         status: "未收齐",
         reason: e.message,
         requestsThisRun: used,
+        requestsThisCity: used - cityStart,
       }),
     );
     if (
