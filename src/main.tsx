@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import WaterPage from "./WaterPage";
 import "./style.css";
+import "./map-list.css";
 import { installTelemetry } from "./telemetry";
 installTelemetry();
 function Router() {

@@ -1,4 +1,5 @@
 import { useWriteResume } from "./useWriteResume";
+import { useMapList } from "./useMapList";
 import { preferredMap, rememberMap } from "./map-preference";
 import { NavigationPanel } from "./NavigationPanel";
 import type { NavigationResult } from "./navigation-domain";
@@ -80,7 +81,6 @@ export default function App() {
     [modal, setModal] = useState<"city" | "config" | "report" | "store" | null>(
       null,
     ),
-    [mobileMap, setMobileMap] = useState(() => innerWidth < 800),
     [loading, setLoading] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
@@ -93,6 +93,14 @@ export default function App() {
     [sharingStore, setSharingStore] = useState(""),
     [analytics, setAnalytics] = useState(analyticsEnabled);
   const [mapChoice, setMapChoice] = useState(preferredMap);
+  const {
+    mapOnly: mobileMap,
+    setMapOnly: setMobileMap,
+    closeList,
+    toggleList,
+    toggleRef,
+    closeRef,
+  } = useMapList();
   useWriteResume(config.writePausedUntil, mapChoice, setConfig);
   const [citySearch, setCitySearch] = useState("");
   const [cityCounts, setCityCounts] = useState<Record<string, number>>({});
@@ -406,254 +414,281 @@ export default function App() {
         </div>
       </header>
       <main className="workspace">
-        <aside className={`sidebar ${mobileMap ? "mobile-hidden" : ""}`}>
-          <h1 className="sr-only">穷鬼地图</h1>
-          <div className="search-area">
-            <button className="location-button" onClick={() => open("city")}>
-              <MapPin size={16} />
-              <span>{city}</span>
-              <ChevronDown size={14} />
-            </button>
-            <label className="search-box">
-              <Search size={18} />
-              <input
-                aria-label="搜索门店"
-                maxLength={80}
-                placeholder="搜门店或品牌"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              {query && (
-                <button aria-label="清空搜索" onClick={() => setQuery("")}>
-                  <X size={15} />
-                </button>
-              )}
-            </label>
-          </div>
-          <nav className="feed-tabs" aria-label="浏览内容">
-            {[
-              ["nearby", "附近门店", Compass],
-              ["saved", "我的收藏", Bookmark],
-            ].map(([id, label, Icon]) => (
-              <button
-                key={id as string}
-                aria-pressed={feed === id}
-                className={feed === id ? "active" : ""}
-                onClick={() => {
-                  setFeed(id as string);
-                  setSelected(null);
-                  track("filter_change", { field: "feed", feed: id });
-                }}
-              >
-                {typeof Icon !== "string" && <Icon size={16} />}
-                {label as string}
-              </button>
-            ))}
-          </nav>
-          <div className="category-grid">
+        <aside
+          id="store-list"
+          aria-label="门店筛选与结果"
+          className={`sidebar ${mobileMap ? "mobile-hidden" : ""}`}
+        >
+          <div className="map-list-heading">
+            <span>附近门店</span>
             <button
-              className={category === "all" ? "active" : ""}
-              aria-pressed={category === "all"}
-              onClick={() => {
-                setCategory("all");
-                track("filter_change", { field: "category", category: "all" });
-              }}
+              className="map-list-close"
+              ref={closeRef}
+              aria-label="关闭门店列表"
+              title="收起列表，查看地图"
+              onClick={closeList}
             >
-              <Compass size={18} />
-              <span>全部</span>
+              <X size={20} />
             </button>
-            {activeCategories.map((c) => (
-              <button
-                key={c.id}
-                className={category === c.id ? "active" : ""}
-                aria-pressed={category === c.id}
-                onClick={() => {
-                  setCategory(c.id);
-                  setSelected(null);
-                  track("filter_change", { field: "category", category: c.id });
-                }}
-              >
-                {c.id === "mixue" ? (
-                  <IceCreamBowl size={18} />
-                ) : (
-                  <ShoppingBag size={18} />
-                )}
-                <span>{c.label}</span>
-              </button>
-            ))}
           </div>
-          <div className="filter-row">
-            <label>
-              <MapPin size={13} />
-              <select
-                aria-label="搜索半径"
-                value={radius}
-                onChange={(e) => {
-                  setRadius(Number(e.target.value));
+          <div className="map-list-scroll">
+            <h1 className="sr-only">穷鬼地图</h1>
+            <div className="search-area">
+              <button className="location-button" onClick={() => open("city")}>
+                <MapPin size={16} />
+                <span>{city}</span>
+                <ChevronDown size={14} />
+              </button>
+              <label className="search-box">
+                <Search size={18} />
+                <input
+                  aria-label="搜索门店"
+                  maxLength={80}
+                  placeholder="搜门店或品牌"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+                {query && (
+                  <button aria-label="清空搜索" onClick={() => setQuery("")}>
+                    <X size={15} />
+                  </button>
+                )}
+              </label>
+            </div>
+            <nav className="feed-tabs" aria-label="浏览内容">
+              {[
+                ["nearby", "附近门店", Compass],
+                ["saved", "我的收藏", Bookmark],
+              ].map(([id, label, Icon]) => (
+                <button
+                  key={id as string}
+                  aria-pressed={feed === id}
+                  className={feed === id ? "active" : ""}
+                  onClick={() => {
+                    setFeed(id as string);
+                    setSelected(null);
+                    track("filter_change", { field: "feed", feed: id });
+                  }}
+                >
+                  {typeof Icon !== "string" && <Icon size={16} />}
+                  {label as string}
+                </button>
+              ))}
+            </nav>
+            <div className="category-grid">
+              <button
+                className={category === "all" ? "active" : ""}
+                aria-pressed={category === "all"}
+                onClick={() => {
+                  setCategory("all");
                   track("filter_change", {
-                    field: "radius",
-                    radius: Number(e.target.value),
+                    field: "category",
+                    category: "all",
                   });
                 }}
               >
-                {[1000, 3000, 5000, 10000].map((n) => (
-                  <option key={n} value={n}>
-                    {n / 1000} km 内
-                  </option>
-                ))}
-              </select>
-            </label>
-            <span className="distance-note">按直线距离排序</span>
-          </div>
-          <p className="discovery-note" role="status">
-            {discoveryNote}
-            <button
-              disabled={
-                discovering ||
-                config.writeReady === false ||
-                config.placeSearchPaused
-              }
-              onClick={() => {
-                void loadSavedPlaces(true);
+                <Compass size={18} />
+                <span>全部</span>
+              </button>
+              {activeCategories.map((c) => (
+                <button
+                  key={c.id}
+                  className={category === c.id ? "active" : ""}
+                  aria-pressed={category === c.id}
+                  onClick={() => {
+                    setCategory(c.id);
+                    setSelected(null);
+                    track("filter_change", {
+                      field: "category",
+                      category: c.id,
+                    });
+                  }}
+                >
+                  {c.id === "mixue" ? (
+                    <IceCreamBowl size={18} />
+                  ) : (
+                    <ShoppingBag size={18} />
+                  )}
+                  <span>{c.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="filter-row">
+              <label>
+                <MapPin size={13} />
+                <select
+                  aria-label="搜索半径"
+                  value={radius}
+                  onChange={(e) => {
+                    setRadius(Number(e.target.value));
+                    track("filter_change", {
+                      field: "radius",
+                      radius: Number(e.target.value),
+                    });
+                  }}
+                >
+                  {[1000, 3000, 5000, 10000].map((n) => (
+                    <option key={n} value={n}>
+                      {n / 1000} km 内
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <span className="distance-note">按直线距离排序</span>
+            </div>
+            <p className="discovery-note" role="status">
+              {discoveryNote}
+              <button
+                disabled={
+                  discovering ||
+                  config.writeReady === false ||
+                  config.placeSearchPaused
+                }
+                onClick={() => {
+                  void loadSavedPlaces(true);
+                }}
+              >
+                {config.placeSearchPaused ? "搜店已暂停" : "刷新门店"}
+              </button>
+            </p>
+            <NavigationPanel
+              gpsOrigin={gpsOrigin}
+              pickedOrigin={navOrigin}
+              mapCenter={center}
+              radius={radius}
+              onLocate={async () => {
+                const p = await currentLocation(true);
+                setGpsOrigin(p);
+                pick(p, "当前位置");
+                return p;
               }}
-            >
-              {config.placeSearchPaused ? "搜店已暂停" : "刷新门店"}
-            </button>
-          </p>
-          <NavigationPanel
-            gpsOrigin={gpsOrigin}
-            pickedOrigin={navOrigin}
-            mapCenter={center}
-            radius={radius}
-            onLocate={async () => {
-              const p = await currentLocation(true);
-              setGpsOrigin(p);
-              pick(p, "当前位置");
-              return p;
-            }}
-            onPickOrigin={() => {
-              setNavPicking(true);
-              setPicking(false);
-              setMobileMap(true);
-            }}
-            onRoute={setNavRoute}
-            onShowRoute={() => setMobileMap(true)}
-          />
-          <div className="result-heading">
-            <span>
-              {(loading || discovering) && !visible.length ? (
-                "正在寻找附近门店…"
-              ) : (
-                <>
-                  附近 <strong>{visible.length}</strong> 家门店
-                </>
+              onPickOrigin={() => {
+                setNavPicking(true);
+                setPicking(false);
+                setMobileMap(true);
+              }}
+              onRoute={setNavRoute}
+              onShowRoute={() => setMobileMap(true)}
+            />
+            <div className="result-heading">
+              <span>
+                {(loading || discovering) && !visible.length ? (
+                  "正在寻找附近门店…"
+                ) : (
+                  <>
+                    附近 <strong>{visible.length}</strong> 家门店
+                  </>
+                )}
+              </span>
+            </div>
+            <div className="results" aria-busy={loading || discovering}>
+              {error && (
+                <div className="empty-state">
+                  <CircleHelp />
+                  <h3>共享门店暂时无法读取</h3>
+                  <p>{error}</p>
+                  <button
+                    className="primary-button"
+                    onClick={() => setRefresh((n) => n + 1)}
+                  >
+                    重新查询
+                  </button>
+                </div>
               )}
-            </span>
-          </div>
-          <div className="results" aria-busy={loading || discovering}>
-            {error && (
-              <div className="empty-state">
-                <CircleHelp />
-                <h3>共享门店暂时无法读取</h3>
-                <p>{error}</p>
-                <button
-                  className="primary-button"
-                  onClick={() => setRefresh((n) => n + 1)}
-                >
-                  重新查询
-                </button>
-              </div>
-            )}
-            {(loading || discovering) &&
-              !visible.length &&
-              [0, 1, 2].map((i) => <div className="skeleton" key={i} />)}
-            {!loading && !discovering && !error && !visible.length && (
-              <div className="empty-state">
-                <Search />
-                <h3>
-                  {feed === "saved" ? "当前范围暂无收藏" : "没有匹配的门店"}
-                </h3>
-                <p>
-                  这一带还没有匹配的门店标记。可以扩大范围、先看宁波，或标记你知道的店。
-                </p>
-                <button
-                  className="secondary-button"
-                  onClick={() => {
-                    setQuery("");
-                    setCategory("all");
-                    setRadius(3000);
-                    setFeed("nearby");
-                  }}
-                >
-                  重置筛选
-                </button>
-                <button
-                  className="secondary-button"
-                  onClick={() => {
-                    pick(cities[0].center, "宁波");
-                    setCategory("all");
-                    setQuery("");
-                    setRadius(3000);
-                    setFeed("nearby");
-                  }}
-                >
-                  看宁波已有门店
-                </button>
-              </div>
-            )}
-            {visible.map((s) => {
-              const cat =
-                activeCategories.find((c) => c.id === s.category) ||
-                activeCategories[0];
-              return (
-                <article
-                  className={`store-card ${selected === s.id ? "selected" : ""}`}
-                  key={s.id}
-                >
-                  <div className="store-top">
-                    <button className="store-open" onClick={() => select(s.id)}>
-                      <span
-                        className="store-avatar"
-                        style={{
-                          background: `${cat.color}20`,
-                          color: cat.color,
-                        }}
+              {(loading || discovering) &&
+                !visible.length &&
+                [0, 1, 2].map((i) => <div className="skeleton" key={i} />)}
+              {!loading && !discovering && !error && !visible.length && (
+                <div className="empty-state">
+                  <Search />
+                  <h3>
+                    {feed === "saved" ? "当前范围暂无收藏" : "没有匹配的门店"}
+                  </h3>
+                  <p>
+                    这一带还没有匹配的门店标记。可以扩大范围、先看宁波，或标记你知道的店。
+                  </p>
+                  <button
+                    className="secondary-button"
+                    onClick={() => {
+                      setQuery("");
+                      setCategory("all");
+                      setRadius(3000);
+                      setFeed("nearby");
+                    }}
+                  >
+                    重置筛选
+                  </button>
+                  <button
+                    className="secondary-button"
+                    onClick={() => {
+                      pick(cities[0].center, "宁波");
+                      setCategory("all");
+                      setQuery("");
+                      setRadius(3000);
+                      setFeed("nearby");
+                    }}
+                  >
+                    看宁波已有门店
+                  </button>
+                </div>
+              )}
+              {visible.map((s) => {
+                const cat =
+                  activeCategories.find((c) => c.id === s.category) ||
+                  activeCategories[0];
+                return (
+                  <article
+                    className={`store-card ${selected === s.id ? "selected" : ""}`}
+                    key={s.id}
+                  >
+                    <div className="store-top">
+                      <button
+                        className="store-open"
+                        onClick={() => select(s.id)}
                       >
-                        {s.category === "mixue" ? (
-                          <IceCreamBowl size={25} />
-                        ) : (
-                          <ShoppingBag size={25} />
-                        )}
-                      </span>
-                      <span className="store-title">
-                        <strong>{s.name}</strong>
-                        <span>
-                          {cat.label} ·{" "}
-                          {s.locationPrecision === "area" ? "约 " : ""}
-                          {distanceText(distance(center, s.location))} · 直线
-                          {storeSourceName(s.source)
-                            ? " · " + storeSourceName(s.source)
-                            : s.source === "demo"
-                              ? " · 演示"
-                              : ""}
+                        <span
+                          className="store-avatar"
+                          style={{
+                            background: `${cat.color}20`,
+                            color: cat.color,
+                          }}
+                        >
+                          {s.category === "mixue" ? (
+                            <IceCreamBowl size={25} />
+                          ) : (
+                            <ShoppingBag size={25} />
+                          )}
                         </span>
-                      </span>
-                    </button>
-                    <button
-                      className={`save-button ${saved.includes(s.id) ? "saved" : ""}`}
-                      aria-label={`${saved.includes(s.id) ? "取消收藏" : "收藏"} ${s.name}`}
-                      aria-pressed={saved.includes(s.id)}
-                      onClick={() => save(s.id)}
-                    >
-                      <Bookmark
-                        size={18}
-                        fill={saved.includes(s.id) ? "currentColor" : "none"}
-                      />
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
+                        <span className="store-title">
+                          <strong>{s.name}</strong>
+                          <span>
+                            {cat.label} ·{" "}
+                            {s.locationPrecision === "area" ? "约 " : ""}
+                            {distanceText(distance(center, s.location))} · 直线
+                            {storeSourceName(s.source)
+                              ? " · " + storeSourceName(s.source)
+                              : s.source === "demo"
+                                ? " · 演示"
+                                : ""}
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        className={`save-button ${saved.includes(s.id) ? "saved" : ""}`}
+                        aria-label={`${saved.includes(s.id) ? "取消收藏" : "收藏"} ${s.name}`}
+                        aria-pressed={saved.includes(s.id)}
+                        onClick={() => save(s.id)}
+                      >
+                        <Bookmark
+                          size={18}
+                          fill={saved.includes(s.id) ? "currentColor" : "none"}
+                        />
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
           </div>
           <div className="sidebar-footer">
             <span className={`status-dot ${demo ? "" : "live"}`} />
@@ -837,9 +872,12 @@ export default function App() {
         </section>
       </main>
       <button
-        className="mobile-toggle"
+        className={`mobile-toggle map-list-toggle ${mobileMap ? "is-map-only" : ""}`}
+        ref={toggleRef}
+        aria-controls="store-list"
+        aria-expanded={!mobileMap}
         onClick={() => {
-          setMobileMap((v) => !v);
+          toggleList();
           track("list_toggle", { action: mobileMap ? "list" : "map" });
         }}
       >

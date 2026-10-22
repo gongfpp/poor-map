@@ -1,0 +1,111 @@
+.app-shell,
+.water-app {
+  min-height: 0;
+}
+.map-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  min-height: 52px;
+  padding: 4px 8px 4px 16px;
+  border-bottom: 1px solid #eeeaf5;
+  color: #625574;
+  background: #fdfcff;
+  font-size: 13px;
+  font-weight: 600;
+}
+.map-list-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: #786294;
+}
+.map-list-close:hover {
+  background: #eee8fa;
+  color: #6341c7;
+}
+.map-list-close:focus-visible,
+.map-list-toggle:focus-visible,
+.water-mobile-toggle button:focus-visible {
+  outline: 2px solid #7750d4;
+  outline-offset: -3px;
+}
+.map-list-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #ded7ec transparent;
+}
+.map-list-scroll > .water-content,
+.map-list-scroll > .results {
+  flex: none;
+  overflow: visible;
+}
+.app-shell .sidebar.mobile-hidden,
+.water-sidebar.water-sidebar-closed {
+  display: none;
+}
+/* An explicit close control replaces the decorative, non-draggable handle. */
+.water-sidebar::before {
+  display: none;
+}
+.app-shell .sidebar {
+  max-height: calc(100% - 28px);
+}
+.app-shell .mobile-toggle.is-map-only,
+.water-mobile-toggle.is-map-only {
+  display: flex;
+}
+@media (min-width: 800px) {
+  .app-shell .mobile-toggle.is-map-only,
+  .water-mobile-toggle.is-map-only {
+    position: absolute;
+    left: 14px;
+    top: 14px;
+    bottom: auto;
+    translate: none;
+    z-index: 10;
+  }
+  .app-shell .mobile-toggle.is-map-only,
+  .water-mobile-toggle button {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 44px;
+    padding: 10px 16px;
+    border: 1px solid #e1d8f4;
+    border-radius: 24px;
+    background: #fff;
+    color: #6741c4;
+    box-shadow: 0 3px 14px #4833651a;
+    font-size: 13px;
+  }
+  .app-shell .mobile-toggle.is-map-only {
+    top: 78px;
+  }
+}
+@media (max-width: 799px) {
+  .map-list-heading {
+    padding-left: 12px;
+    min-height: 48px;
+  }
+  .map-list-close {
+    width: 44px;
+    height: 44px;
+  }
+  .water-mobile-toggle button,
+  .app-shell .mobile-toggle {
+    min-height: 44px;
+  }
+  .water-sidebar,
+  .app-shell .sidebar {
+    max-height: calc(100% - 66px);
+  }
+}

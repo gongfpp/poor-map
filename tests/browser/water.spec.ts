@@ -99,11 +99,25 @@ test("three-field editing preserves unknown specs and persists across another br
       },
     }),
   );
-  await second.goto("/#/water");
-  await expect(
-    second.locator(".water-offer").filter({ hasText: "东鼓道" }),
-  ).toContainText("容量待补充");
-  await other.close();
+  // This second context must also avoid loading a real supplier SDK during CRUD tests.
+  await second.route("**/api/water/config*", (r) =>
+    r.fulfill({
+      json: {
+        provider: "tianditu",
+        jsKey: "",
+        mapReady: false,
+        searchReady: false,
+      },
+    }),
+  );
+  try {
+    await second.goto("/#/water");
+    await expect(
+      second.locator(".water-offer").filter({ hasText: "东鼓道" }),
+    ).toContainText("容量待补充");
+  } finally {
+    await other.close();
+  }
   await card.getByRole("button", { name: /查看.*历史/ }).click();
   await expect(page.getByRole("dialog")).toContainText("修改前");
 });
