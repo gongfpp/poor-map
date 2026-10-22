@@ -20,6 +20,15 @@ const limit = Number(
   process.argv.find((x) => x.startsWith("--budget="))?.split("=")[1] || 3000,
 );
 const refresh = process.argv.includes("--refresh");
+const fillGaps = process.argv.includes("--fill-gaps");
+const selectedKeywords = process.argv
+  .find((x) => x.startsWith("--keywords="))
+  ?.slice(11)
+  .split(",");
+if (fillGaps && refresh)
+  throw Error("Gap collection cannot refresh existing snapshots.");
+if (selectedKeywords?.some((k) => !brandQueries.some(([, name]) => name === k)))
+  throw Error("UNKNOWN_COLLECTION_KEYWORD");
 if (!Number.isInteger(limit) || limit < 1 || limit > 10000)
   throw Error("INVALID_REQUEST_BUDGET");
 const cities =
@@ -28,7 +37,9 @@ const cities =
     : selection === "priority"
       ? collectionCities.filter((c) => c.priority)
       : collectionCities.filter((c) => selection.split(",").includes(c.name));
-const keywords = brandQueries;
+const keywords = selectedKeywords
+  ? brandQueries.filter(([, k]) => selectedKeywords.includes(k))
+  : brandQueries;
 mkdirSync(".data", { recursive: true });
 const file = ".data/city-collection.json",
   job = existsSync(file)
@@ -104,10 +115,10 @@ function normalize(p, category, keyword, root) {
     source: "amap",
   };
 }
-async function district(code, all = false) {
+async function district(code, all = false, levels = 1) {
   const d = await api("/v3/config/district", {
     keywords: code,
-    subdistrict: 1,
+    subdistrict: levels,
     extensions: all ? "all" : "base",
   });
   return (
@@ -134,7 +145,33 @@ async function fetchSegment(
     bounds?.join(",") || "text",
     ...(types ? [types] : []),
   ].join(":");
-  if (entry.segments[key]?.scanned || entry.segments[key]?.complete) return;
+  const previous = entry.segments[key];
+  if (previous?.scanned || previous?.complete) {
+    if (!fillGaps || depth !== 0 || previous.complete || previous.gapExpanded)
+      return;
+    // Explore smaller districts without rereading the incomplete city search.
+    entry.gapDistricts ||= {};
+    if (!entry.gapDistricts[area.adcode]) {
+      const a = await district(area.adcode, false, 2);
+      const districts = [];
+      function visit(nodes) {
+        for (const node of nodes || []) {
+          if (node.level === "district" && node.adcode !== area.adcode)
+            districts.push({ adcode: node.adcode });
+          else visit(node.districts);
+        }
+      }
+      visit(a?.districts);
+      entry.gapDistricts[area.adcode] = districts;
+      checkpoint();
+    }
+    for (const child of entry.gapDistricts[area.adcode])
+      await fetchSegment(entry, city, category, keyword, child, depth + 1);
+    // Original mismatch remains visible; exploring districts is not proof of completeness.
+    previous.gapExpanded = true;
+    checkpoint();
+    return;
+  }
   const params = bounds
     ? {
         keywords: keyword,
@@ -251,14 +288,19 @@ for (const c of ordered) {
     delete entry.lastError;
     checkpoint();
   }
-  const currentKeywords = keywords.map(([category, keyword]) =>
+  const currentKeywords = brandQueries.map(([category, keyword]) =>
     [category, keyword, collectionQueryTypes(category, keyword)]
       .filter(Boolean)
       .join(":"),
   );
   const unchanged =
     JSON.stringify(entry.keywordSet || []) === JSON.stringify(currentKeywords);
-  if ((entry.scanned || entry.complete) && unchanged) {
+  if (
+    !fillGaps &&
+    !selectedKeywords &&
+    (entry.scanned || entry.complete) &&
+    unchanged
+  ) {
     console.log(c.name + " 已有已读取分页快照，跳过重复请求。");
     continue;
   }
@@ -280,7 +322,7 @@ for (const c of ordered) {
         adcode: entry.adcode,
       });
     entry.complete = Object.values(entry.segments).every((s) => s.complete);
-    entry.keywordSet = currentKeywords;
+    if (!selectedKeywords) entry.keywordSet = currentKeywords;
     entry.scanned = true;
     delete entry.lastError;
     entry.fetchedAt = new Date().toISOString();

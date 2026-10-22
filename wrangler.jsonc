@@ -3,7 +3,7 @@
   "main": "worker/index.mjs",
   "compatibility_date": "2026-10-07",
   "workers_dev": true,
-  "vars": { "PLACE_SEARCH_PAUSED": "true" },
+  "vars": { "PLACE_SEARCH_PAUSED": "false" },
   "d1_databases": [
     {
       "binding": "DB",

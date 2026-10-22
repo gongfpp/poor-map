@@ -1,8 +1,10 @@
 # 穷鬼地图
 
+<img src="public/favicon.svg" width="56" alt="穷鬼地图紫色钱包图标">
+
 以地图寻找附近硬折扣店、大型商超和蜜雪冰城，用户用一句话分享线索、回复纠错；独立「大水地图」页面比较具体水价。界面保持地图、侧栏和手机底部列表，没有banner。
 
-本轮已收集56城市、40,574条品牌门店参考记录并保存共享缓存，另有100条附近候选（共享缓存总计40,674条），详见[城市采集记录](docs/COLLECTION_REPORT.md)。数据可能不完整，不能证明营业或低价。
+本轮已收集56城市、40,581条品牌门店参考记录并保存共享缓存，另有100条附近候选（共享缓存总计40,681条），详见[城市采集记录](docs/COLLECTION_REPORT.md)。数据可能不完整，不能证明营业或低价。
 
 [附近地图](https://gongfpp.github.io/poor-map/) · [大水地图](https://gongfpp.github.io/poor-map/#/water) · [GitHub 仓库](https://github.com/gongfpp/poor-map)
 
@@ -12,13 +14,13 @@
 
 大水地图支持半径、大瓶/小瓶/整箱、每升价格、整份标价、距离和库存反馈筛选。波动价格按上限比较，未知容量不参与每升排序。详见 [大水地图](docs/WATER.md)。
 
-## 历史界面原型（演示数据）
+## 实际运行界面
 
-以下桌面与移动端图片是仓库内已有的旧版原型图。图中的道路、门店点位、距离和收藏状态均为演示内容，不代表当前线上底图或真实门店数据；当前功能请以[在线界面](https://gongfpp.github.io/poor-map/)为准。
+2026-10-22线上实测：宁波参考中心、大型商超筛选；道路来自真实高德SDK，门店读取共享缓存。截图未使用设备定位，店名和地址为公开POI；门店位置不证明营业、价格或库存。
 
 <p align="center">
-  <img src="docs/preview-desktop.png" width="520" alt="穷鬼地图历史桌面端界面原型，演示道路和门店数据">
-  <img src="docs/preview-mobile.png" width="290" alt="穷鬼地图历史移动端界面原型，演示道路和门店数据">
+  <img src="docs/live-map-desktop.png" width="640" alt="穷鬼地图真实桌面运行界面，左侧显示宁波大型商超列表，右侧高德道路地图显示同类门店标记">
+  <img src="docs/live-map-mobile.png" width="260" alt="穷鬼地图真实手机运行界面，显示大型商超类型筛选、宁波高德道路底图和商超标记">
 </p>
 
 ## 运行
