@@ -62,13 +62,17 @@ try {
     ["mobile", { width: 390, height: 844 }],
     ["narrow", { width: 320, height: 568 }],
   ]) {
-    if (process.env.VERIFY_VIEWPORT && process.env.VERIFY_VIEWPORT !== size)
+    if (
+      process.env.VERIFY_VIEWPORT &&
+      !process.env.VERIFY_VIEWPORT.split(",").includes(size)
+    )
       continue;
     const context = await browser.newContext({ viewport });
     await context.addInitScript(() =>
       localStorage.setItem("poor-map:analytics", "off"),
     );
     const page = await context.newPage();
+    let recoveredReads = 0;
     const errors = [],
       queries = [],
       writes = [],
@@ -156,16 +160,36 @@ try {
     if (!remote) await friendContext.route(`${backend}/**`, bridge);
     try {
       const friend = await friendContext.newPage();
+      async function readSharedStore() {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          await expect
+            .poll(
+              async () =>
+                (await friend.locator(".detail-card h3").count()) > 0 ||
+                (await friend.locator(".shared-store-message button").count()) >
+                  0,
+              { timeout: 22000 },
+            )
+            .toBe(true);
+          if (await friend.locator(".detail-card h3").count()) {
+            await expect(friend.locator(".detail-card h3")).toHaveText(name);
+            return;
+          }
+          if (attempt === 2)
+            throw new Error(`${size}: 分享门店重试后仍无法读取`);
+          recoveredReads++;
+          await friend
+            .locator(".shared-store-message")
+            .getByRole("button", { name: "重试", exact: true })
+            .click();
+        }
+      }
       await friend.goto(shared, { waitUntil: "domcontentloaded" });
-      await expect(friend.locator(".detail-card h3")).toHaveText(name, {
-        timeout: 30000,
-      });
+      await readSharedStore();
       await expect(friend.locator(".community")).toBeVisible();
       await expect(friend.locator(".location-help")).toHaveCount(0);
       await friend.reload({ waitUntil: "domcontentloaded" });
-      await expect(friend.locator(".detail-card h3")).toHaveText(name, {
-        timeout: 30000,
-      });
+      await readSharedStore();
       await expect(friend.locator(".map-source")).toContainText("高德地图", {
         timeout: 30000,
       });
@@ -212,8 +236,11 @@ try {
       realTiles: tiles.length,
       cacheReads: queries.length,
       sharedStore: name,
+      recoveredReads,
     });
-    console.log(`${size}: 真实底图、品牌筛选、分享直达与水价筛选通过`);
+    console.log(
+      `${size}: 真实底图、品牌筛选、分享直达与水价筛选通过；读取重试 ${recoveredReads} 次`,
+    );
     await context.close();
   }
   if (remote) {
