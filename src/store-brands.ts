@@ -39,6 +39,25 @@ export function brandCategory(name: string) {
     matchesBrand(storefront, keyword),
   )?.[0];
 }
+
+// 筛选复用采集的别名规则，旧名盒马 NB 只显示为一个品牌。
+export const storeBrands = brandQueries
+  .filter(([, keyword]) => keyword !== "盒马NB")
+  .map(([category, id]) => ({
+    id,
+    label: id === "超盒算" ? "超盒算NB" : id,
+    category,
+  }));
+export function storeBrand(name: string) {
+  const storefront = name.split(/[（(]/)[0];
+  return (
+    storeBrands.find((brand) => matchesBrand(storefront, brand.id))?.id ||
+    "unknown"
+  );
+}
+export function matchesStoreBrand(name: string, brand: string) {
+  return brand === "all" || storeBrand(name) === brand;
+}
 export function isStoreName(name: string) {
   return (
     !!name.trim() &&

@@ -10,6 +10,37 @@ export async function communityRoute(
 ) {
   const url = new URL(req.url),
     path = url.pathname;
+  if (path.startsWith("/api/community/stores/") && req.method === "GET") {
+    const id = path.slice("/api/community/stores/".length);
+    if (!/^[\w-]{1,160}$/.test(id))
+      return output({ error: "门店链接无效。" }, 400);
+    // 按明确 ID 读取，不做模糊匹配、不调用供应商，也不写入种子。
+    const canonical =
+      scope === "public" ? seedStores.find((s) => s.amapId === id) : null;
+    const shared = await env.DB.prepare(
+      "SELECT record FROM stores WHERE scope=? AND id=?",
+    )
+      .bind(scope, canonical?.id || id)
+      .first();
+    if (shared) return output({ store: JSON.parse(shared.record) });
+    if (scope === "public") {
+      const seed = canonical || seedStores.find((s) => s.id === id);
+      if (seed) return output({ store: seed });
+    }
+    const cached = await env.DB.prepare(
+      "SELECT record,fetched_at FROM cached_pois WHERE scope=? AND provider IN ('amap','baidu','tencent','tianditu') AND id=? LIMIT 1",
+    )
+      .bind(scope, id)
+      .first();
+    if (cached)
+      return output({
+        store: { ...JSON.parse(cached.record), cachedAt: cached.fetched_at },
+      });
+    return output(
+      { error: "这家门店尚未收录或已无法读取，可返回地图查找。" },
+      404,
+    );
+  }
   if (path === "/api/community/qa" && req.method === "DELETE") {
     if (!isQA) return output({ error: "未授权。" }, 403);
     await env.DB.batch(

@@ -12,6 +12,8 @@
 
 首页默认「全部」，启用硬折扣、大型商超和蜜雪冰城；量贩零食归入硬折扣。门店卡片显示店名、类别、直线距离，不推断单品价格或店铺价格上限。超盒算NB（兼容旧名盒马NB）、奥乐齐、乐尔乐归入硬折扣；永辉、沃尔玛、大润发、三江购物、物美、华润万家、盒马鲜生、家家悦归入大型商超。品牌仅用于分类，不代表整店低价、当前有货或有团购。旧分类配置保留用于后续扩展。选中门店后输入一句话即可分享，每条评论可以回复，回复可以继续回复。详见 [共享评论](docs/COMMUNITY.md)。
 
+首页与大水地图支持门店品牌筛选；品牌来自当前范围已载门店，超盒算NB与旧名盒马NB合并，未知品牌仍保留。筛选同步地图、列表与数量，沿用最多500家及不完整提示。门店详情可复制 `#/store/<id>` 直达链接，另一浏览器打开后直接查看同一家店和讨论；链接不含设备位置。定位失败时明确显示参考中心，并可选择位置或重试。
+
 大水地图支持半径、大瓶/小瓶/整箱、每升价格、整份标价、距离和库存反馈筛选。波动价格按上限比较，未知容量不参与每升排序。详见 [大水地图](docs/WATER.md)。
 
 ## 实际运行界面
@@ -87,9 +89,11 @@ npm run test:e2e
 npm run deploy:api
 npm run build:pages
 npm run verify:pages
+npm run verify:find-share
 # 源码已提交且工作区干净后
 npm run publish:pages
 npm run verify:pages -- https://gongfpp.github.io/poor-map/
+npm run verify:find-share -- https://gongfpp.github.io/poor-map/
 npm run verify:water -- https://gongfpp.github.io/poor-map/#/water
 npm run verify:community -- https://gongfpp.github.io/poor-map/
 npm run verify:map -- https://gongfpp.github.io/poor-map/

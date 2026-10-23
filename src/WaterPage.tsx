@@ -1,5 +1,8 @@
 import { useWriteResume } from "./useWriteResume";
 import { useMapList } from "./useMapList";
+import BrandFilter from "./BrandFilter";
+import LocationHelp from "./LocationHelp";
+import { brandCategory, matchesStoreBrand } from "./store-brands";
 import { preferredMap, rememberMap } from "./map-preference";
 import { storeSourceName } from "./domain";
 import { discoverStores, discoverAmap, cacheDescription } from "./discovery";
@@ -24,7 +27,7 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { distance, distanceText, type Store } from "./domain";
+import { cities, distance, distanceText, type Store } from "./domain";
 import {
   ningboCenter,
   liters,
@@ -114,19 +117,61 @@ export default function WaterPage() {
     [candidates, setCandidates] = useState<Store[]>([]),
     [candidateNote, setCandidateNote] = useState("正在检查周边门店服务…");
   const [selected, setSelected] = useState<string | null>(null),
-    [modal, setModal] = useState<"edit" | "feedback" | "history" | null>(null),
+    [modal, setModal] = useState<
+      "edit" | "feedback" | "history" | "city" | null
+    >(null),
     [editing, setEditing] = useState<WaterOffer | WaterInput | null>(null),
     [feedbackOffer, setFeedbackOffer] = useState<WaterOffer | null>(null),
     [notice, setNotice] = useState(""),
     [draftCenter, setDraftCenter] = useState<[number, number] | null>(null),
     [locating, setLocating] = useState(false);
+  const [storeType, setStoreType] = useState("all"),
+    [brand, setBrand] = useState("all"),
+    [locationHelp, setLocationHelp] = useState("");
   useWriteResume(config.writePausedUntil, mapChoice, setConfig);
   const { mapOnly, setMapOnly, closeList, toggleList, toggleRef, closeRef } =
     useMapList();
   const chosen = useRef(false);
+  const centerRevision = useRef(0);
+  function offerCategory(o: WaterOffer) {
+    return (
+      candidates.find((s) => s.id === o.storeId)?.category ||
+      seedStores.find((s) => s.id === o.storeId)?.category ||
+      brandCategory(o.storeName) ||
+      "market"
+    );
+  }
+  const brandNames = [
+    ...candidates
+      .filter(
+        (s) =>
+          (storeType === "all" || s.category === storeType) &&
+          distance(center, s.location) <= filters.radius,
+      )
+      .map((s) => s.name),
+    ...offers
+      .filter(
+        (o) =>
+          o.location &&
+          distance(center, o.location) <= filters.radius &&
+          (storeType === "all" || offerCategory(o) === storeType),
+      )
+      .map((o) => o.storeName),
+  ];
+  const visibleCandidates = candidates.filter(
+    (s) =>
+      (storeType === "all" || s.category === storeType) &&
+      distance(center, s.location) <= filters.radius &&
+      matchesStoreBrand(s.name, brand),
+  );
   const visible = useMemo(
-    () => waterResults(offers, center, filters),
-    [offers, center, filters, tick],
+    () =>
+      waterResults(offers, center, filters).filter(
+        (o) =>
+          (storeType === "all" || offerCategory(o) === storeType) &&
+          matchesStoreBrand(o.storeName, brand),
+      ),
+    [offers, center, filters, tick, storeType, brand, candidates],
   );
   const known = visible.filter((o) => usableOffer(o) && perLiter(o) !== null);
   const lowest = known.length ? perLiterHigh(known[0]) : null;
@@ -140,12 +185,12 @@ export default function WaterPage() {
           name: o.storeName,
           address: o.address,
           location: o.location,
-          category: "discount",
+          category: offerCategory(o),
           tags: ["社区水价"],
           source: "community",
           amapId: seedStores.find((s) => s.id === o.storeId)?.amapId,
         });
-    for (const s of candidates)
+    for (const s of visibleCandidates)
       if (
         distance(center, s.location) <= filters.radius &&
         !entries.has(s.id) &&
@@ -153,7 +198,7 @@ export default function WaterPage() {
       )
         entries.set(s.id, s);
     return [...entries.values()];
-  }, [visible, candidates, center, filters.radius]);
+  }, [visible, candidates, center, filters.radius, storeType, brand]);
   const markerLabels = useMemo(
     () => Object.fromEntries(mapStores.map((s) => [s.id, s.name])),
     [mapStores],
@@ -174,8 +219,10 @@ export default function WaterPage() {
         }
       })
       .catch((e) => {
-        if (active && !chosen.current)
+        if (active && !chosen.current) {
           setPosition(`${e.message} · 以宁波为中心`);
+          setLocationHelp("定位未成功，当前查看宁波。");
+        }
       });
     return () => {
       active = false;
@@ -253,24 +300,32 @@ export default function WaterPage() {
   }, [notice]);
   function pickCenter(point: [number, number], label: string) {
     chosen.current = true;
+    centerRevision.current++;
+    setLocating(false);
     setCenter(point);
     setPosition(label);
     setSelected(null);
     setDraftCenter(null);
+    setLocationHelp("");
   }
   async function locate() {
     track("location_request");
     chosen.current = true;
+    const revision = ++centerRevision.current;
     setLocating(true);
     try {
-      pickCenter(await currentLocation(true), "当前位置 · 已获得设备定位");
+      const point = await currentLocation(true);
+      if (revision !== centerRevision.current) return;
+      pickCenter(point, "当前位置 · 已获得设备定位");
       track("location_success");
     } catch (e) {
+      if (revision !== centerRevision.current) return;
       track("location_failure");
       setPosition(`${(e as Error).message} · 保留当前中心`);
-      setNotice("定位失败，可先看宁波已有线索，或允许浏览器的位置权限后重试。");
+      setLocationHelp("定位未成功，保留当前地图位置。");
+      if (window.innerWidth < 800) setMapOnly(true);
     } finally {
-      setLocating(false);
+      if (revision === centerRevision.current) setLocating(false);
     }
   }
   function edit(offer?: WaterOffer | WaterInput) {
@@ -279,6 +334,7 @@ export default function WaterPage() {
     setModal("edit");
   }
   function chooseStore(id: string) {
+    setLocationHelp("");
     const offer = linkedOffer(id);
     if (offer) {
       if (visible.some((o) => o.id === offer.id)) {
@@ -356,7 +412,16 @@ export default function WaterPage() {
           补充水价
         </button>
       </header>
-      <main className="water-main">
+      <main className="water-main" data-list-open={!mapOnly}>
+        {!!locationHelp && (
+          <LocationHelp
+            message={locationHelp}
+            busy={locating}
+            onChoose={() => setModal("city")}
+            onRetry={() => void locate()}
+            onDismiss={() => setLocationHelp("")}
+          />
+        )}
         <aside
           id="water-list"
           className={`water-sidebar ${mapOnly ? "water-sidebar-closed" : ""}`}
@@ -408,6 +473,34 @@ export default function WaterPage() {
               </p>
             )}
             <section className="water-toolbox">
+              <div className="water-store-filters">
+                <label className="brand-filter">
+                  <span>类型</span>
+                  <select
+                    aria-label="水价门店类型"
+                    value={storeType}
+                    onChange={(e) => {
+                      setStoreType(e.target.value);
+                      setBrand("all");
+                      setSelected(null);
+                    }}
+                  >
+                    <option value="all">全部门店</option>
+                    <option value="discount">硬折扣店</option>
+                    <option value="supermarket">大型商超</option>
+                    <option value="market">其他门店</option>
+                  </select>
+                </label>
+                <BrandFilter
+                  names={brandNames}
+                  value={brand}
+                  label="水价门店品牌"
+                  onChange={(value) => {
+                    setBrand(value);
+                    setSelected(null);
+                  }}
+                />
+              </div>
               <label className="water-search">
                 <Search size={17} />
                 <input
@@ -692,7 +785,10 @@ export default function WaterPage() {
                 })}
                 {offers.some(
                   (o) =>
-                    !o.location && (filters.includeInactive || usableOffer(o)),
+                    !o.location &&
+                    (storeType === "all" || offerCategory(o) === storeType) &&
+                    matchesStoreBrand(o.storeName, brand) &&
+                    (filters.includeInactive || usableOffer(o)),
                 ) && (
                   <div className="water-unlocated">
                     <h3>尚未定位的社区线索</h3>
@@ -701,6 +797,9 @@ export default function WaterPage() {
                       .filter(
                         (o) =>
                           !o.location &&
+                          (storeType === "all" ||
+                            offerCategory(o) === storeType) &&
+                          matchesStoreBrand(o.storeName, brand) &&
                           (filters.includeInactive || usableOffer(o)),
                       )
                       .map((o) => (
@@ -715,7 +814,7 @@ export default function WaterPage() {
               <details className="water-candidates">
                 <summary>
                   <ShoppingBag size={16} />
-                  附近超市 <b>{candidates.length}</b>
+                  附近超市 <b>{visibleCandidates.length}</b>
                 </summary>
                 <p>
                   {candidateNote}{" "}
@@ -728,7 +827,10 @@ export default function WaterPage() {
                     {config.placeSearchPaused ? "搜店已暂停" : "刷新门店"}
                   </button>
                 </p>
-                {candidates.map((s) => (
+                {!visibleCandidates.length && (
+                  <p>当前筛选下没有已载门店，可选择全部品牌或扩大范围。</p>
+                )}
+                {visibleCandidates.map((s) => (
                   <div key={s.id}>
                     <span>
                       <strong>{s.name}</strong>
@@ -870,6 +972,26 @@ export default function WaterPage() {
           </button>
         </div>
       </main>
+      {modal === "city" && (
+        <Modal title="选择参考城市" onClose={() => setModal(null)}>
+          <p className="modal-copy">
+            选择城市中心后，可拖动地图并点击“搜索这里的水价”。
+          </p>
+          <div className="city-grid">
+            {cities.map((c) => (
+              <button
+                key={c.name}
+                onClick={() => {
+                  pickCenter(c.center, `${c.name} · 手动参考中心`);
+                  setModal(null);
+                }}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
       {notice && (
         <div className="toast" role="status">
           {notice}

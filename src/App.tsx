@@ -1,5 +1,9 @@
 import { useWriteResume } from "./useWriteResume";
 import { useMapList } from "./useMapList";
+import BrandFilter from "./BrandFilter";
+import LocationHelp from "./LocationHelp";
+import { matchesStoreBrand } from "./store-brands";
+import { storeLink } from "./store-link";
 import { preferredMap, rememberMap } from "./map-preference";
 import { NavigationPanel } from "./NavigationPanel";
 import type { NavigationResult } from "./navigation-domain";
@@ -23,6 +27,7 @@ import {
   X,
   MessageCircle,
   IceCreamBowl,
+  Link,
 } from "lucide-react";
 import {
   activeCategories,
@@ -48,7 +53,7 @@ function readSaved(): string[] {
   }
 }
 const emptyEventIds = new Set<string>();
-export default function App() {
+export default function App({ sharedStoreId }: { sharedStoreId?: string }) {
   const [config, setConfig] = useState({
       provider: "amap" as "amap" | "tianditu",
       jsKey: "",
@@ -64,7 +69,8 @@ export default function App() {
     [city, setCity] = useState("宁波"),
     [center, setCenter] = useState<[number, number]>(cities[0].center),
     [draftCenter, setDraftCenter] = useState<[number, number] | null>(null),
-    [category, setCategory] = useState("all"),
+    [category, setCategoryValue] = useState("all"),
+    [brand, setBrand] = useState("all"),
     [query, setQuery] = useState(""),
     [radius, setRadius] = useState(3000),
     [feed, setFeed] = useState("nearby"),
@@ -78,9 +84,9 @@ export default function App() {
     [navPicking, setNavPicking] = useState(false),
     [navRoute, setNavRoute] = useState<NavigationResult | null>(null),
     [selected, setSelected] = useState<string | null>(null),
-    [modal, setModal] = useState<"city" | "config" | "report" | "store" | null>(
-      null,
-    ),
+    [modal, setModal] = useState<
+      "city" | "config" | "report" | "store" | "link" | null
+    >(null),
     [loading, setLoading] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
@@ -92,6 +98,18 @@ export default function App() {
     [placeBusy, setPlaceBusy] = useState(false),
     [sharingStore, setSharingStore] = useState(""),
     [analytics, setAnalytics] = useState(analyticsEnabled);
+  const [locationHelp, setLocationHelp] = useState("");
+  const [linkValue, setLinkValue] = useState("");
+  const [sharedStore, setSharedStore] = useState<Store | null>(null);
+  const [sharedError, setSharedError] = useState("");
+  const [sharedLoading, setSharedLoading] = useState(
+    sharedStoreId !== undefined,
+  );
+  const [sharedRetry, setSharedRetry] = useState(0);
+  function setCategory(value: string) {
+    setCategoryValue(value);
+    setBrand("all");
+  }
   const [mapChoice, setMapChoice] = useState(preferredMap);
   const {
     mapOnly: mobileMap,
@@ -128,12 +146,15 @@ export default function App() {
       });
     return () => c.abort();
   }, [modal]);
-  const chosen = useRef(false);
+  const chosen = useRef(sharedStoreId !== undefined);
+  const centerRevision = useRef(0);
   useEffect(() => {
+    if (sharedStoreId !== undefined) return;
     let active = true;
     track("location_request");
     currentLocation()
       .then((p) => {
+        if (!active) return;
         setGpsOrigin(p);
         track("location_success");
         if (active && !chosen.current) {
@@ -141,11 +162,57 @@ export default function App() {
           setCity("当前位置");
         }
       })
-      .catch(() => track("location_failure"));
+      .catch(() => {
+        if (active) {
+          track("location_failure");
+          if (!chosen.current) setLocationHelp("定位未成功，当前查看宁波。");
+        }
+      });
     return () => {
       active = false;
     };
   }, []);
+  useEffect(() => {
+    if (sharedStoreId === undefined) return;
+    const c = new AbortController();
+    if (!sharedStoreId) {
+      setSharedError("门店链接无效，请返回地图查找。");
+      setSharedLoading(false);
+      return;
+    }
+    setSharedLoading(true);
+    setSharedError("");
+    fetch(
+      `${WATER_API}/api/community/stores/${encodeURIComponent(sharedStoreId)}`,
+      { signal: AbortSignal.any([c.signal, AbortSignal.timeout(15000)]) },
+    )
+      .then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "暂时无法打开门店，请重试。");
+        if (!d.store?.location || !d.store?.id)
+          throw new Error("门店数据无效，请重试。");
+        if (c.signal.aborted) return;
+        setSharedStore(d.store);
+        setCenter(d.store.location);
+        setCity("分享门店附近");
+        setSelected(d.store.id);
+        setMobileMap(true);
+      })
+      .catch((e) => {
+        if (!c.signal.aborted)
+          setSharedError(
+            e.name === "TimeoutError"
+              ? "门店读取超时，请重试。"
+              : e instanceof TypeError
+                ? "暂时无法连接门店服务，请重试。"
+                : e.message,
+          );
+      })
+      .finally(() => {
+        if (!c.signal.aborted) setSharedLoading(false);
+      });
+    return () => c.abort();
+  }, [sharedStoreId, sharedRetry]);
   useEffect(() => {
     const c = new AbortController();
     fetch(`${WATER_API}/api/water/config?map=${mapChoice}`, {
@@ -162,7 +229,23 @@ export default function App() {
       });
     return () => c.abort();
   }, [refresh, mapChoice]);
-  const stores = useMemo(() => mergeStores(live, nearby), [live, nearby]);
+  const stores = useMemo(
+    () =>
+      mergeStores(
+        sharedStore && !live.some((s) => s.id === sharedStore.id)
+          ? [...live, sharedStore]
+          : live,
+        nearby,
+      ),
+    [live, nearby, sharedStore],
+  );
+  const brandNames = stores
+    .filter(
+      (s) =>
+        (category === "all" || s.category === category) &&
+        distance(center, s.location) <= radius,
+    )
+    .map((s) => s.name);
   const discoveryRequest = useRef<AbortController | null>(null);
   async function loadSavedPlaces(manual = false) {
     discoveryRequest.current?.abort();
@@ -192,12 +275,13 @@ export default function App() {
     }
   }
   useEffect(() => {
+    if (sharedLoading || sharedError) return;
     const timer = setTimeout(() => void loadSavedPlaces(), query ? 350 : 0);
     return () => {
       clearTimeout(timer);
       discoveryRequest.current?.abort();
     };
-  }, [center, radius, refresh, category, query]);
+  }, [center, radius, refresh, category, query, sharedLoading, sharedError]);
 
   const visible = useMemo(
     () =>
@@ -205,6 +289,7 @@ export default function App() {
         .filter(
           (s) =>
             (category === "all" || s.category === category) &&
+            matchesStoreBrand(s.name, brand) &&
             (!query ||
               `${s.name} ${s.address}`
                 .toLowerCase()
@@ -215,7 +300,7 @@ export default function App() {
         .sort(
           (a, b) => distance(center, a.location) - distance(center, b.location),
         ),
-    [stores, category, query, radius, center, feed, saved],
+    [stores, category, brand, query, radius, center, feed, saved],
   );
   const current = stores.find((s) => s.id === selected);
   useEffect(() => {
@@ -289,28 +374,37 @@ export default function App() {
   };
   function pick(p: [number, number], label: string) {
     chosen.current = true;
+    centerRevision.current++;
+    setLocating(false);
     setCenter(p);
     setCity(label);
     setSelected(null);
     setDraftCenter(null);
+    setLocationHelp("");
     track("city_change");
   }
   async function locate() {
+    chosen.current = true;
+    const revision = ++centerRevision.current;
     setLocating(true);
     track("location_request");
     try {
       const p = await currentLocation(true);
+      if (revision !== centerRevision.current) return;
       setGpsOrigin(p);
       pick(p, "当前位置");
       track("location_success");
     } catch (e) {
-      setNotice((e as Error).message);
+      if (revision !== centerRevision.current) return;
+      setLocationHelp(`${(e as Error).message}，仍查看${city}。`);
+      if (window.innerWidth < 800) setMobileMap(true);
       track("location_failure");
     } finally {
-      setLocating(false);
+      if (revision === centerRevision.current) setLocating(false);
     }
   }
   function select(id: string) {
+    setLocationHelp("");
     setSelected(id);
     track("store_open", {
       source: stores.find((s) => s.id === id)?.source || "demo",
@@ -344,6 +438,16 @@ export default function App() {
   function share() {
     setSharingStore(selected || visible[0]?.id || stores[0]?.id || "");
     open("report");
+  }
+  async function copyStoreLink(s: Store) {
+    const url = storeLink(s.id, import.meta.env.BASE_URL, location.origin);
+    try {
+      await navigator.clipboard.writeText(url);
+      setNotice("门店链接已复制，可发给朋友。");
+    } catch {
+      setLinkValue(url);
+      setModal("link");
+    }
   }
   async function searchPlace(e: React.FormEvent) {
     e.preventDefault();
@@ -413,7 +517,16 @@ export default function App() {
           </button>
         </div>
       </header>
-      <main className="workspace">
+      <main className="workspace" data-list-open={!mobileMap}>
+        {!!locationHelp && (
+          <LocationHelp
+            message={locationHelp}
+            busy={locating}
+            onChoose={() => open("city")}
+            onRetry={() => void locate()}
+            onDismiss={() => setLocationHelp("")}
+          />
+        )}
         <aside
           id="store-list"
           aria-label="门店筛选与结果"
@@ -513,6 +626,16 @@ export default function App() {
                 </button>
               ))}
             </div>
+            <div className="sidebar-brand-filter">
+              <BrandFilter
+                names={brandNames}
+                value={brand}
+                onChange={(value) => {
+                  setBrand(value);
+                  setSelected(null);
+                }}
+              />
+            </div>
             <div className="filter-row">
               <label>
                 <MapPin size={13} />
@@ -605,7 +728,9 @@ export default function App() {
                     {feed === "saved" ? "当前范围暂无收藏" : "没有匹配的门店"}
                   </h3>
                   <p>
-                    这一带还没有匹配的门店标记。可以扩大范围、先看宁波，或标记你知道的店。
+                    {brand !== "all"
+                      ? "当前已载门店中没有这个品牌的匹配记录，可清除品牌或扩大范围；不代表这里没有门店。"
+                      : "这一带还没有匹配的门店标记。可以扩大范围、先看宁波，或标记你知道的店。"}
                   </p>
                   <button
                     className="secondary-button"
@@ -707,28 +832,39 @@ export default function App() {
           className={`map-panel ${mobileMap ? "mobile-visible" : ""}`}
           aria-label="附近线索地图"
         >
-          <label className="map-type-filter">
-            <span>类型</span>
-            <select
-              aria-label="地图门店类型"
-              value={category}
-              onChange={(e) => {
-                setCategory(e.target.value);
+          <div className="map-filter-stack">
+            <label className="map-type-filter">
+              <span>类型</span>
+              <select
+                aria-label="地图门店类型"
+                value={category}
+                onChange={(e) => {
+                  setCategory(e.target.value);
+                  setSelected(null);
+                  track("filter_change", {
+                    field: "category",
+                    category: e.target.value,
+                  });
+                }}
+              >
+                <option value="all">全部</option>
+                {activeCategories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <BrandFilter
+              names={brandNames}
+              value={brand}
+              onChange={(value) => {
+                setBrand(value);
                 setSelected(null);
-                track("filter_change", {
-                  field: "category",
-                  category: e.target.value,
-                });
               }}
-            >
-              <option value="all">全部</option>
-              {activeCategories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </label>
+              label="地图门店品牌"
+            />
+          </div>
           <div className="map-topbar">
             <div>
               <h2>
@@ -773,6 +909,22 @@ export default function App() {
             radiusMeters={radius}
             canLocate={true}
           />
+
+          {(sharedLoading || sharedError) && (
+            <div className="shared-store-message" role="status">
+              <p>{sharedLoading ? "正在打开分享的门店…" : sharedError}</p>
+              {!sharedLoading && (
+                <div>
+                  {!!sharedStoreId && (
+                    <button onClick={() => setSharedRetry((n) => n + 1)}>
+                      重试
+                    </button>
+                  )}
+                  <a href={import.meta.env.BASE_URL}>返回地图</a>
+                </div>
+              )}
+            </div>
+          )}
           <div className="compact-map-status">
             <span>
               {navPicking
@@ -851,6 +1003,14 @@ export default function App() {
                   {current.locationPrecision === "area"
                     ? "查看参考位置"
                     : "到这里去"}
+                </button>
+                <button
+                  className="icon-button"
+                  title="复制门店链接"
+                  aria-label="复制门店链接"
+                  onClick={() => void copyStoreLink(current)}
+                >
+                  <Link size={18} />
                 </button>
                 <button
                   className="icon-button"
@@ -965,6 +1125,20 @@ export default function App() {
             <LocateFixed size={17} />
             使用我的当前位置
           </button>
+        </Modal>
+      )}
+      {modal === "link" && (
+        <Modal title="门店链接" onClose={() => setModal(null)}>
+          <p className="modal-copy">
+            浏览器未允许自动复制，可选中下方链接手动复制。
+          </p>
+          <input
+            className="share-link-input"
+            aria-label="门店分享链接"
+            value={linkValue}
+            readOnly
+            onFocus={(e) => e.target.select()}
+          />
         </Modal>
       )}
       {modal === "report" && (

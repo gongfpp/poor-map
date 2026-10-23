@@ -5,6 +5,7 @@ import WaterPage from "./WaterPage";
 import "./style.css";
 import "./map-list.css";
 import { installTelemetry } from "./telemetry";
+import { sharedStoreId } from "./store-link";
 installTelemetry();
 function Router() {
   const [route, setRoute] = useState(location.hash);
@@ -13,7 +14,12 @@ function Router() {
     window.addEventListener("hashchange", update);
     return () => window.removeEventListener("hashchange", update);
   }, []);
-  return route.startsWith("#/water") ? <WaterPage /> : <App />;
+  const storeId = sharedStoreId(route);
+  return route.startsWith("#/water") ? (
+    <WaterPage />
+  ) : (
+    <App key={storeId ?? "home"} sharedStoreId={storeId} />
+  );
 }
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
