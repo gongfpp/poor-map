@@ -1,7 +1,7 @@
 import { writesPaused } from "./availability.mjs";
 import { seedStores, validateStore } from "../src/store-domain.ts";
 import { correctStorePoint } from "./reference-migration.mjs";
-import { eventNames, cleanProperties } from "../src/telemetry-schema.ts";
+import { analyticsRoute } from "./analytics.mjs";
 export async function communityRoute(
   req,
   env,
@@ -10,6 +10,8 @@ export async function communityRoute(
 ) {
   const url = new URL(req.url),
     path = url.pathname;
+  if (path.startsWith("/api/analytics/"))
+    return analyticsRoute(req, env, scope, { rate, body, output });
   if (path.startsWith("/api/community/stores/") && req.method === "GET") {
     const id = path.slice("/api/community/stores/".length);
     if (!/^[\w-]{1,160}$/.test(id))
@@ -172,92 +174,6 @@ export async function communityRoute(
         201,
       );
     }
-  }
-  if (path === "/api/analytics/events" && req.method === "POST") {
-    if (!(await rate(req, env, scope, 120, "analytics")))
-      return output({ error: "请求较频繁。" }, 429);
-    const input = await body(req);
-    if (
-      !/^[a-f0-9-]{36}$/.test(input.session || "") ||
-      !Array.isArray(input.events) ||
-      input.events.length > 24
-    )
-      return output({ error: "无效事件。" }, 400);
-    const now = new Date().toISOString(),
-      eventScope =
-        scope === "public" && url.hostname === "127.0.0.1"
-          ? "development"
-          : scope;
-    const statements = [];
-    for (const e of input.events) {
-      if (
-        !eventNames.includes(e.name) ||
-        !["home", "water"].includes(e.page) ||
-        !/^[a-f0-9-]{36}$/.test(e.id || "")
-      )
-        continue;
-      statements.push(
-        env.DB.prepare(
-          "INSERT OR IGNORE INTO analytics_events(scope,id,session_id,page,name,properties,created_at) VALUES(?,?,?,?,?,?,?)",
-        ).bind(
-          eventScope,
-          e.id,
-          input.session,
-          e.page,
-          e.name,
-          JSON.stringify(cleanProperties(e.properties)),
-          now,
-        ),
-      );
-    }
-    if (statements.length) await env.DB.batch(statements);
-    await env.DB.prepare("DELETE FROM analytics_events WHERE created_at<?")
-      .bind(new Date(Date.now() - 30 * 86400000).toISOString())
-      .run();
-    return output({ accepted: statements.length });
-  }
-  if (path === "/api/analytics/stats" && req.method === "GET") {
-    if (
-      !env.ANALYTICS_TOKEN ||
-      req.headers.get("authorization") !== `Bearer ${env.ANALYTICS_TOKEN}`
-    )
-      return output({ error: "需要统计访问凭据。" }, 403);
-    const days = Math.min(
-        30,
-        Math.max(1, Number(url.searchParams.get("days")) || 7),
-      ),
-      since = new Date(Date.now() - days * 86400000).toISOString();
-    const summary = await env.DB.prepare(
-      "SELECT COUNT(*) AS events,COUNT(DISTINCT session_id) AS sessions,SUM(CASE WHEN name='page_view' THEN 1 ELSE 0 END) AS pageViews FROM analytics_events WHERE scope=? AND created_at>=?",
-    )
-      .bind(scope, since)
-      .first();
-    const events = await env.DB.prepare(
-      "SELECT page,name,COUNT(*) AS count FROM analytics_events WHERE scope=? AND created_at>=? GROUP BY page,name ORDER BY count DESC",
-    )
-      .bind(scope, since)
-      .all();
-    const daily = await env.DB.prepare(
-      "SELECT substr(created_at,1,10) AS day,COUNT(*) AS events,COUNT(DISTINCT session_id) AS sessions FROM analytics_events WHERE scope=? AND created_at>=? GROUP BY day ORDER BY day",
-    )
-      .bind(scope, since)
-      .all();
-    const dimensions = await env.DB.prepare(
-      "SELECT name,properties,COUNT(*) AS count FROM analytics_events WHERE scope=? AND created_at>=? GROUP BY name,properties ORDER BY count DESC LIMIT 100",
-    )
-      .bind(scope, since)
-      .all();
-    return output({
-      days,
-      retentionDays: 30,
-      summary,
-      events: events.results,
-      daily: daily.results,
-      dimensions: dimensions.results.map((d) => ({
-        ...d,
-        properties: JSON.parse(d.properties),
-      })),
-    });
   }
   return output({ error: "接口不存在。" }, 404);
 }

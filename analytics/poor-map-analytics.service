@@ -1,0 +1,20 @@
+[Unit]
+Description=Poor Map private analytics collector
+After=network.target
+[Service]
+User=poor-map-analytics
+Group=poor-map-analytics
+WorkingDirectory=/opt/poor-map-analytics/current
+LoadCredentialEncrypted=analytics.env:/etc/credstore.encrypted/poor-map-analytics.env
+ExecStart=/usr/bin/node --experimental-strip-types --env-file=%d/analytics.env /opt/poor-map-analytics/current/analytics/server.mjs
+Restart=on-failure
+RestartSec=3
+StateDirectory=poor-map-analytics
+StateDirectoryMode=0700
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+UMask=0077
+[Install]
+WantedBy=multi-user.target

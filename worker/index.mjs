@@ -6,6 +6,7 @@ import {
   placeSearchPauseMessage,
 } from "./availability.mjs";
 import { communityRoute } from "./community.mjs";
+import { proxyAnalytics } from "./analytics-proxy.mjs";
 import { amapDiscovery } from "./discovery.mjs";
 import {
   readPlaces,
@@ -161,6 +162,26 @@ export async function route(req, env) {
   ) {
     if (req.method === "POST" && !isQA && !origins.has(origin))
       return output({ error: "请从穷鬼地图页面提交。" }, 403);
+    if (env.ANALYTICS_ORIGIN && path.startsWith("/api/analytics/"))
+      return proxyAnalytics(req, env, scope, { body, output });
+    if (
+      env.ANALYTICS_ORIGIN &&
+      path === "/api/community/qa" &&
+      req.method === "DELETE" &&
+      isQA &&
+      scope.startsWith("qa:")
+    ) {
+      const cleanup = await proxyAnalytics(
+        new Request(new URL("/api/analytics/qa", req.url), {
+          method: "DELETE",
+          headers: req.headers,
+        }),
+        env,
+        scope,
+        { body, output },
+      );
+      if (!cleanup.ok) return cleanup;
+    }
     if (writesPaused(env) && ["POST", "PUT"].includes(req.method))
       return path.startsWith("/api/analytics/")
         ? output({ accepted: 0, paused: true }, 202)

@@ -3,7 +3,10 @@
   "main": "worker/index.mjs",
   "compatibility_date": "2026-10-07",
   "workers_dev": true,
-  "vars": { "PLACE_SEARCH_PAUSED": "false" },
+  "vars": {
+    "PLACE_SEARCH_PAUSED": "false",
+    "ANALYTICS_ORIGIN": "https://stats.gongfpp.icu/poor-map",
+  },
   "d1_databases": [
     {
       "binding": "DB",

@@ -24,7 +24,8 @@
     "report:cities": "node scripts/report-collection.mjs",
     "verify:cache-stress": "node --use-env-proxy scripts/verify-cache-stress.mjs",
     "verify:backups": "node --import tsx --use-env-proxy scripts/verify-backups.mjs",
-    "verify:find-share": "node --use-env-proxy scripts/verify-find-share.mjs"
+    "verify:find-share": "node --use-env-proxy scripts/verify-find-share.mjs",
+    "verify:analytics": "node --use-env-proxy scripts/verify-analytics.mjs"
   },
   "dependencies": {
     "dotenv": "^18.0.6",
