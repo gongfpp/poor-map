@@ -27,7 +27,7 @@ npm run analytics:report -- https://poor-map-api.gong7968.workers.dev 7
 - `worker/analytics.mjs`为本地/腾讯云共用协议；`worker/analytics-proxy.mjs`只转发白名单接口，不转发原始IP、Cookie、浏览器UA或QA凭据。`ANALYTICS_ORIGIN`为非秘密配置，`ANALYTICS_INGEST_TOKEN`仅服务端持有。转发失败返回503，前端有限队列重试，不静默写回D1。
 - 腾讯云端再次校验事件/属性和管理员凭据，公网直连写入需要入口凭据；QA按`qa:<scope>`隔离，`DELETE /api/analytics/qa`只清理相应QA范围。既有community QA清理也同步清理腾讯云事件。
 - 小时盐化的限流标识仅留在采集进程的有界内存，不落数据库。每小时120批、最多2000桶；这是单实例限流。服务重启会重置限流桶，统计数据保留。
-- 服务启动、每小时及每次事件写入清理超过30天的事件；本地开发仍可使用SQLite原接口。当前实现没有可视化管理看板，管理查询继续使用受保护聚合接口和`npm run analytics:report`。
+- 服务启动、每小时及每次事件写入清理超过30天的事件；本地开发仍可使用SQLite原接口。可视化入口为 https://stats.gongfpp.icu/overview/#poor-map ，复用已有Umami owner登录；也可使用受保护聚合接口和`npm run analytics:report`。
 - 运行目录`/opt/poor-map-analytics/current`，服务`poor-map-analytics.service`，仅监听`127.0.0.1:3160`；数据`/var/lib/poor-map-analytics/events.sqlite`；凭据`/etc/credstore.encrypted/poor-map-analytics.env`，由systemd解密到运行时目录。Caddy在已有stats域名上按`/poor-map/*`转发，不改变其他统计站点。
 - 部署：`node scripts/deploy-analytics.mjs`，通过已信任SSH主机发送版本包和加密凭据；`npm run deploy:api`发布入口。不要把凭据复制进命令行参数、浏览器或日志。首次部署还需按现有Caddy站点增加路径转发并验证后reload。
 - 验收：`npm run verify:analytics`。真实桌面/手机首页与大水地图事件使用隔离QA范围，检查入库、属性清洗、重复提交去重、关闭统计/Do Not Track、服务重启持久化和测试数据清理。这里只验证埋点，不替代底图供应商验收。
@@ -41,3 +41,5 @@ npm run analytics:report -- https://poor-map-api.gong7968.workers.dev 7
 - `npm run build`通过；接口/数据全套96项通过，随后新增正式流量范围回归并完成8项针对性复验。浏览器全套初次68通过、2失败、2既有跳过；手机编辑超时单独复验通过，时钟初始化竞态修复后桌面/手机4项全部通过。最终覆盖70项通过、2项既有跳过。
 - Worker发布版本`34a8dbb5-4a7c-4dd5-9820-2c0d98b40fa4`。本轮未修改前端交互或静态资源，Pages继续使用`f8b34f1`版本，通过原接口接入腾讯云。
 - 迁移命令为`node --import tsx scripts/migrate-analytics.mjs`；正式切换后用`--retire-source`逐条核对成功才清理快照之前的公开旧统计。此脚本不读取或清理门店、水价及评论数据。
+
+2026-10-30统一看板已上线：https://stats.gongfpp.icu/overview/ 。独立analytics-hub服务只读接入穷鬼地图、久留美、界面图谱与超时；不迁移底层数据，不合并跨项目身份。穷鬼地图看板显示最近7/14/30天访问、会话、事件、定位与地图错误；其他项目保留来源口径和不完整提示。

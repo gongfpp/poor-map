@@ -50,3 +50,5 @@
 - 2026-10-23用户确认极简方向：本版仅品牌筛选、门店直达分享、定位失败引导；不做此前建议的第二轮内容/社区扩展或第三轮专题/品类/商圈运营。品牌仅筛选已载缓存，地图与列表一致；分享仅携带公开门店ID，GET /api/community/stores/:id只读缓存/社区，不触发供应商搜店。后续范围见docs/ROADMAP.md。
 
 - 2026-10-30埋点迁至腾讯云独立poor-map-analytics服务，Worker仅作为兼容入口；事件协议与30天留存见docs/ANALYTICS.md。ANALYTICS_INGEST_TOKEN仅服务端，严禁进Pages/Git/日志。地图/水价/社区仍用原D1，QA事件须隔离清理。
+
+- 统一可视化统计入口为https://stats.gongfpp.icu/overview/#poor-map，独立analytics-hub只读展示，复用Umami owner登录，不修改本项目采集协议。
