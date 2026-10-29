@@ -6,7 +6,8 @@ for (const route of ["/", "/#/water"]) {
     page,
   }) => {
     const resetAt = Date.now() + 3000;
-    await page.clock.install({ time: new Date(resetAt - 3000) });
+    // Install before the paused baseline so elapsed setup time cannot move past it.
+    await page.clock.install({ time: new Date(resetAt - 63000) });
     await page.clock.pauseAt(new Date(resetAt - 3000));
     let restored = false;
     let configs = 0,
