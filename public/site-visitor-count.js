@@ -5,6 +5,8 @@
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   async function mount(element, site, isDisabled = () => false) {
     element.textContent = '网站累计访问人数：—';
+    // 本机预览不访问生产统计，也不创建访客身份。
+    if (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) || location.protocol === 'file:') return;
     const url = 'https://stats.gongfpp.icu/api/journey/v1/site-counts/' + encodeURIComponent(site);
     let identity = null;
     try {
