@@ -7,6 +7,22 @@ try {
 } catch {}
 let queue: unknown[] = [];
 let installed = false;
+// 隐私撤销后丢弃旧批次，恢复授权也不补报。
+let privacyEpoch = 0;
+function discardPending() {
+  queue = [];
+  privacyEpoch += 1;
+}
+function permitted() {
+  return (
+    analyticsEnabled() &&
+    navigator.doNotTrack !== "1" &&
+    navigator.doNotTrack !== "yes" &&
+    !(navigator as Navigator & { globalPrivacyControl?: boolean })
+      .globalPrivacyControl &&
+    !(STATIC_DEMO && location.hostname !== "gongfpp.github.io")
+  );
+}
 export function analyticsEnabled() {
   try {
     return localStorage.getItem("poor-map:analytics") !== "off";
@@ -18,18 +34,16 @@ export function setAnalyticsEnabled(enabled: boolean) {
   try {
     localStorage.setItem("poor-map:analytics", enabled ? "on" : "off");
   } catch {}
-  if (!enabled) queue = [];
+  if (!enabled) discardPending();
 }
 export function track(
   name: EventName,
   properties: Record<string, unknown> = {},
 ) {
-  if (
-    !analyticsEnabled() ||
-    navigator.doNotTrack === "1" ||
-    (STATIC_DEMO && location.hostname !== "gongfpp.github.io")
-  )
+  if (!permitted()) {
+    discardPending();
     return;
+  }
   queue.push({
     id: crypto.randomUUID(),
     page: location.hash.startsWith("#/water") ? "water" : "home",
@@ -40,7 +54,12 @@ export function track(
   if (queue.length >= 12) void flush();
 }
 async function flush(beacon = false) {
+  if (!permitted()) {
+    discardPending();
+    return;
+  }
   if (!queue.length) return;
+  const epoch = privacyEpoch;
   const events = queue.splice(0, 24),
     payload = JSON.stringify({ session, events }),
     url = `${WATER_API}/api/analytics/events`;
@@ -60,13 +79,15 @@ async function flush(beacon = false) {
       body: payload,
       keepalive: true,
     });
-    if (!r.ok && r.status >= 500) {
+    if (!r.ok && r.status >= 500 && permitted() && epoch === privacyEpoch) {
       queue.unshift(...events);
       queue = queue.slice(0, 96);
     }
   } catch {
-    queue.unshift(...events);
-    queue = queue.slice(0, 96);
+    if (permitted() && epoch === privacyEpoch) {
+      queue.unshift(...events);
+      queue = queue.slice(0, 96);
+    }
   }
 }
 export function installTelemetry() {

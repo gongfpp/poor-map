@@ -10,7 +10,9 @@
     />
     <title>穷鬼地图 · 把钱花在刀刃上</title>
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
-  </head>
+  <script>window.siteVisitorCountDisabled = function () { try { return localStorage.getItem("poor-map:analytics") === "off"; } catch { return true; } };</script>
+<script defer src="%BASE_URL%site-events.js" data-site-events="poor-map"></script>
+</head>
   <body>
     <div id="root"></div>
     <script src="%BASE_URL%site-visitor-count.js"></script>
