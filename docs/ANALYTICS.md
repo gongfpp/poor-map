@@ -43,3 +43,10 @@ npm run analytics:report -- https://poor-map-api.gong7968.workers.dev 7
 - 迁移命令为`node --import tsx scripts/migrate-analytics.mjs`；正式切换后用`--retire-source`逐条核对成功才清理快照之前的公开旧统计。此脚本不读取或清理门店、水价及评论数据。
 
 2026-10-30统一看板已上线：https://stats.gongfpp.icu/overview/ 。独立analytics-hub服务只读接入穷鬼地图、久留美、界面图谱与超时；不迁移底层数据，不合并跨项目身份。穷鬼地图看板显示最近7/14/30天访问、会话、事件、定位与地图错误；其他项目保留来源口径和不完整提示。
+
+
+## 首页累计访客
+
+首页脚注从 `https://stats.gongfpp.icu/api/journey/v1/site-counts/poor-map` 读取累计值；首次访问通过同一接口登记独立随机浏览器标识。标识仅保存在本站自己的 localStorage 键中，90 天后轮换，不读取地图、社区、存档或登录身份，不发送位置、查询、评论、URL 参数或片段。已有统计关闭选项及 DNT/GPC 均使本功能只读取数字、不登记标识。
+
+累计值基于登记标识去重，不是页面浏览次数或真人身份统计；清除存储、更换浏览器或标识轮换可能形成新访客。没有把原有 30 天事件记录换算成历史人数，也不删除原统计。接口不可用时显示破折号。

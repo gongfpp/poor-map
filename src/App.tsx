@@ -54,6 +54,12 @@ function readSaved(): string[] {
 }
 const emptyEventIds = new Set<string>();
 export default function App({ sharedStoreId }: { sharedStoreId?: string }) {
+  const visitorCountRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (visitorCountRef.current) {
+      window.SiteVisitorCount?.mount(visitorCountRef.current, "poor-map", () => !analyticsEnabled());
+    }
+  }, []);
   const [config, setConfig] = useState({
       provider: "amap" as "amap" | "tianditu",
       jsKey: "",
@@ -1031,6 +1037,7 @@ export default function App({ sharedStoreId }: { sharedStoreId?: string }) {
           )}
         </section>
       </main>
+      <footer className="site-visitor-count" ref={visitorCountRef}>网站累计访问人数：—</footer>
       <button
         className={`mobile-toggle map-list-toggle ${mobileMap ? "is-map-only" : ""}`}
         ref={toggleRef}

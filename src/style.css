@@ -1921,3 +1921,5 @@ button:hover {
     scroll-behavior: auto !important;
   }
 }
+
+.site-visitor-count { flex: 0 0 auto; color: #888; font-size: 11px; line-height: 1.5; text-align: center; padding: 3px 12px; background: #fff; }
